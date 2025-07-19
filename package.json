@@ -1,5 +1,5 @@
 {
-  "name": "canvas-mcp-server-puppeteer",
+  "name": "canvas-mcp-puppeteer",
   "version": "1.0.0",
   "main": "server.js",
   "type": "module",
