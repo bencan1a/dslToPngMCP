@@ -26,7 +26,7 @@ export function renderDSLtoHTML({ width, height, elements, css }) {
       return `<input ${cls} style="${style}" placeholder="${el.placeholder || ""}" />`;
     }
 
-    return ""; // Unrecognized types are skipped
+    return "";
   };
 
   const body = elements.map(renderElement).join("\n");
