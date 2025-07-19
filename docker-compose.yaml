@@ -1,0 +1,16 @@
+services:
+  render-server:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - BROWSERLESS_ENDPOINT=ws://chrome:3000
+
+  chrome:
+    image: browserless/chrome:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PREBOOT_CHROME=true
+      - DEFAULT_BLOCK_ADS=true
+      - MAX_CONCURRENT_SESSIONS=5
