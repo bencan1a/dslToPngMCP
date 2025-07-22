@@ -1,0 +1,51 @@
+# Roo Rules for DSL to PNG MCP Project
+
+## Testing Rules
+
+### CRITICAL: Docker Compose Testing Only
+- **NEVER run `pytest` directly** in this workspace
+- **ALWAYS use Docker Compose** for running tests: `docker compose -f docker/docker-compose.test.yml up`
+- Direct pytest commands will fail due to missing service dependencies (PostgreSQL, Redis, etc.)
+
+### Testing Commands
+```bash
+# Run all tests (PRIMARY METHOD)
+docker compose -f docker/docker-compose.test.yml up
+
+# Run specific test categories within Docker environment
+docker compose -f docker/docker-compose.test.yml run test-runner pytest -m "smoke"      # Smoke tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/unit/    # Unit tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/integration/ # Integration tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/performance/ # Performance tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/security/    # Security tests
+```
+
+### Testing Environment Requirements
+- PostgreSQL database service (configured in docker-compose.test.yml)
+- Redis service for caching and message queuing
+- Proper environment variables and test configuration
+- Browser automation dependencies (Playwright)
+- All dependencies must be available through Docker Compose
+
+### When Writing/Running Tests
+1. Always assume Docker Compose environment
+2. Refer to `docs/TESTING_FRAMEWORK_SUMMARY.md` for comprehensive testing documentation
+3. Use test fixtures from `tests/conftest.py` 
+4. Follow test categories: smoke, unit, integration, performance, security
+5. Tests are organized in `tests/` directory with proper structure
+
+### Test Documentation
+- Primary documentation: `docs/TESTING_FRAMEWORK_SUMMARY.md`
+- Framework overview: `docs/testing/test-framework-overview.md`
+- Validation guide: `docs/testing/validation-guide.md`
+
+## Project Structure
+- Source code: `src/`
+- Tests: `tests/`
+- Docker configs: `docker/`
+- Documentation: `docs/`
+
+## Development Workflow
+- This is an MCP (Model Context Protocol) server project
+- Testing framework is comprehensive with 16,903 lines of test infrastructure
+- All testing must go through containerized environment for consistency

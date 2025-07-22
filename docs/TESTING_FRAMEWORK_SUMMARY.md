@@ -176,30 +176,22 @@ I have successfully developed a comprehensive testing framework for the DSL to P
 ## ✅ Framework Usage
 
 ### Quick Start Commands
+
+**⚠️ Important: All tests must be run using Docker Compose to ensure proper environment setup and dependencies.**
+
 ```bash
-# Install dependencies
-pip install -r requirements/dev.txt
+# Run all tests (REQUIRED METHOD)
+docker compose -f docker/docker-compose.test.yml up
 
-# Run all tests
-pytest
+# Alternative: Run specific test categories within Docker environment
+docker compose -f docker/docker-compose.test.yml run test-runner pytest -m "smoke"  # Smoke tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/unit/  # Unit tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/integration/  # Integration tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/performance/  # Performance tests
+docker compose -f docker/docker-compose.test.yml run test-runner pytest tests/security/  # Security tests
+```
 
-# Smoke tests (< 2 minutes)
-pytest -m "smoke"
-
-# Unit tests only
-pytest tests/unit/
-
-# Integration tests
-pytest tests/integration/
-
-# Performance tests
-pytest tests/performance/
-
-# Security tests
-pytest tests/security/
-
-# Docker tests
-docker compose -f docker/docker compose.test.yml up
+**Note**: Direct `pytest` commands should not be used outside the Docker environment as they lack the required service dependencies (PostgreSQL, Redis, etc.) and proper environment configuration.
 ```
 
 ### CI/CD Integration
