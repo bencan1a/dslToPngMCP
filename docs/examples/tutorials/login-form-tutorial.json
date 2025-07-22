@@ -1,0 +1,126 @@
+{
+  "title": "Login Form Tutorial - Complete Example",
+  "description": "Professional login form with validation styling and accessibility features",
+  "width": 400,
+  "height": 350,
+  "elements": [
+    {
+      "type": "container",
+      "id": "login-container",
+      "layout": {
+        "x": 50,
+        "y": 50,
+        "width": 300,
+        "height": 250
+      },
+      "style": {
+        "background": "white",
+        "borderRadius": "12px",
+        "padding": "24px",
+        "boxShadow": "0 4px 20px rgba(0, 0, 0, 0.1)",
+        "border": "1px solid #e5e7eb"
+      },
+      "children": [
+        {
+          "type": "text",
+          "text": "Welcome Back",
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "width": 252,
+            "height": 30
+          },
+          "style": {
+            "fontSize": 20,
+            "fontWeight": "bold",
+            "textAlign": "center",
+            "color": "#333333",
+            "marginBottom": "20px"
+          }
+        },
+        {
+          "type": "input",
+          "id": "username-input",
+          "placeholder": "Username",
+          "layout": {
+            "x": 0,
+            "y": 45,
+            "width": 252,
+            "height": 40
+          },
+          "style": {
+            "fontSize": 14,
+            "padding": "10px 12px",
+            "border": "2px solid #e1e5e9",
+            "borderRadius": "6px",
+            "marginBottom": "12px",
+            "transition": "border-color 0.3s ease, box-shadow 0.3s ease"
+          },
+          "customAttributes": {
+            "type": "text",
+            "autocomplete": "username",
+            "required": "true",
+            "aria-label": "Enter your username"
+          }
+        },
+        {
+          "type": "input",
+          "id": "password-input",
+          "placeholder": "Password",
+          "layout": {
+            "x": 0,
+            "y": 97,
+            "width": 252,
+            "height": 40
+          },
+          "style": {
+            "fontSize": 14,
+            "padding": "10px 12px",
+            "border": "2px solid #e1e5e9",
+            "borderRadius": "6px",
+            "marginBottom": "16px",
+            "transition": "border-color 0.3s ease, box-shadow 0.3s ease"
+          },
+          "customAttributes": {
+            "type": "password",
+            "autocomplete": "current-password",
+            "required": "true",
+            "aria-label": "Enter your password"
+          }
+        },
+        {
+          "type": "button",
+          "id": "signin-button",
+          "label": "Sign In",
+          "layout": {
+            "x": 0,
+            "y": 149,
+            "width": 252,
+            "height": 45
+          },
+          "style": {
+            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "color": "white",
+            "fontSize": 16,
+            "fontWeight": "600",
+            "border": "none",
+            "borderRadius": "8px",
+            "cursor": "pointer",
+            "transition": "all 0.3s ease"
+          },
+          "onClick": "handleSignIn()",
+          "customAttributes": {
+            "type": "submit",
+            "aria-label": "Sign in to your account"
+          }
+        }
+      ]
+    }
+  ],
+  "css": ".dsl-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); outline: none; } .dsl-button:hover { background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3); } .dsl-button:active { transform: translateY(0); } .dsl-button:focus { outline: none; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2); }",
+  "metadata": {
+    "tutorial_step": "complete",
+    "difficulty": "intermediate",
+    "concepts": ["form design", "input validation", "accessibility", "containers", "responsive styling"]
+  }
+}

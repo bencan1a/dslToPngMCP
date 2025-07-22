@@ -1,0 +1,460 @@
+{
+  "title": "Dashboard Tutorial - Complete Example",
+  "description": "Responsive analytics dashboard with navigation, metrics cards, and charts",
+  "width": 1200,
+  "height": 800,
+  "elements": [
+    {
+      "type": "navbar",
+      "id": "dashboard-navbar",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 1200,
+        "height": 60
+      },
+      "style": {
+        "background": "#1f2937",
+        "color": "white",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "padding": "0 24px"
+      },
+      "children": [
+        {
+          "type": "text",
+          "text": "Analytics Dashboard",
+          "style": {
+            "fontSize": 20,
+            "fontWeight": "bold",
+            "color": "#60a5fa"
+          }
+        },
+        {
+          "type": "text",
+          "text": "Welcome, Admin",
+          "style": {
+            "fontSize": 14,
+            "color": "#d1d5db"
+          }
+        }
+      ]
+    },
+    {
+      "type": "grid",
+      "id": "metrics-grid",
+      "layout": {
+        "x": 24,
+        "y": 84,
+        "width": 1152,
+        "height": 200
+      },
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "repeat(4, 1fr)",
+        "gap": "24px"
+      },
+      "responsive": {
+        "lg": {
+          "style": {
+            "gridTemplateColumns": "repeat(3, 1fr)"
+          }
+        },
+        "md": {
+          "style": {
+            "gridTemplateColumns": "repeat(2, 1fr)"
+          }
+        },
+        "sm": {
+          "style": {
+            "gridTemplateColumns": "1fr"
+          }
+        }
+      },
+      "children": [
+        {
+          "type": "card",
+          "id": "revenue-card",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "20px",
+            "border": "1px solid #e5e7eb",
+            "transition": "box-shadow 0.3s ease"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "Total Revenue",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 14,
+                "color": "#6b7280",
+                "fontWeight": "500"
+              }
+            },
+            {
+              "type": "text",
+              "text": "$47,281",
+              "layout": {
+                "x": 0,
+                "y": 30,
+                "width": 228,
+                "height": 40
+              },
+              "style": {
+                "fontSize": 28,
+                "fontWeight": "bold",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "text",
+              "text": "↗ +12.5% from last month",
+              "layout": {
+                "x": 0,
+                "y": 80,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 12,
+                "color": "#10b981",
+                "fontWeight": "500"
+              }
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "id": "users-card",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "20px",
+            "border": "1px solid #e5e7eb",
+            "transition": "box-shadow 0.3s ease"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "Active Users",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 14,
+                "color": "#6b7280",
+                "fontWeight": "500"
+              }
+            },
+            {
+              "type": "text",
+              "text": "12,847",
+              "layout": {
+                "x": 0,
+                "y": 30,
+                "width": 228,
+                "height": 40
+              },
+              "style": {
+                "fontSize": 28,
+                "fontWeight": "bold",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "text",
+              "text": "↗ +8.2% from last month",
+              "layout": {
+                "x": 0,
+                "y": 80,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 12,
+                "color": "#10b981",
+                "fontWeight": "500"
+              }
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "id": "orders-card",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "20px",
+            "border": "1px solid #e5e7eb",
+            "transition": "box-shadow 0.3s ease"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "Total Orders",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 14,
+                "color": "#6b7280",
+                "fontWeight": "500"
+              }
+            },
+            {
+              "type": "text",
+              "text": "1,429",
+              "layout": {
+                "x": 0,
+                "y": 30,
+                "width": 228,
+                "height": 40
+              },
+              "style": {
+                "fontSize": 28,
+                "fontWeight": "bold",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "text",
+              "text": "↘ -2.1% from last month",
+              "layout": {
+                "x": 0,
+                "y": 80,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 12,
+                "color": "#ef4444",
+                "fontWeight": "500"
+              }
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "id": "conversion-card",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "20px",
+            "border": "1px solid #e5e7eb",
+            "transition": "box-shadow 0.3s ease"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "Conversion Rate",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 14,
+                "color": "#6b7280",
+                "fontWeight": "500"
+              }
+            },
+            {
+              "type": "text",
+              "text": "3.24%",
+              "layout": {
+                "x": 0,
+                "y": 30,
+                "width": 228,
+                "height": 40
+              },
+              "style": {
+                "fontSize": 28,
+                "fontWeight": "bold",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "text",
+              "text": "↗ +0.4% from last month",
+              "layout": {
+                "x": 0,
+                "y": 80,
+                "width": 228,
+                "height": 20
+              },
+              "style": {
+                "fontSize": 12,
+                "color": "#10b981",
+                "fontWeight": "500"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flex",
+      "id": "charts-section",
+      "layout": {
+        "x": 24,
+        "y": 320,
+        "width": 1152,
+        "height": 450
+      },
+      "style": {
+        "display": "flex",
+        "gap": "24px"
+      },
+      "responsive": {
+        "md": {
+          "style": {
+            "flexDirection": "column"
+          }
+        }
+      },
+      "children": [
+        {
+          "type": "card",
+          "id": "revenue-chart",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "24px",
+            "border": "1px solid #e5e7eb",
+            "flex": "1"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "Revenue Trend",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 516,
+                "height": 30
+              },
+              "style": {
+                "fontSize": 18,
+                "fontWeight": "600",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "container",
+              "id": "chart-placeholder",
+              "layout": {
+                "x": 0,
+                "y": 50,
+                "width": 516,
+                "height": 350
+              },
+              "style": {
+                "background": "#f9fafb",
+                "borderRadius": "8px",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "border": "2px dashed #d1d5db"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "text": "📊 Chart Visualization Area",
+                  "style": {
+                    "fontSize": 16,
+                    "color": "#6b7280",
+                    "textAlign": "center"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "id": "activity-chart",
+          "style": {
+            "background": "white",
+            "borderRadius": "8px",
+            "padding": "24px",
+            "border": "1px solid #e5e7eb",
+            "flex": "1"
+          },
+          "children": [
+            {
+              "type": "text",
+              "text": "User Activity",
+              "layout": {
+                "x": 0,
+                "y": 0,
+                "width": 516,
+                "height": 30
+              },
+              "style": {
+                "fontSize": 18,
+                "fontWeight": "600",
+                "color": "#111827"
+              }
+            },
+            {
+              "type": "container",
+              "id": "activity-placeholder",
+              "layout": {
+                "x": 0,
+                "y": 50,
+                "width": 516,
+                "height": 350
+              },
+              "style": {
+                "background": "#f9fafb",
+                "borderRadius": "8px",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "border": "2px dashed #d1d5db"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "text": "📈 Activity Metrics",
+                  "style": {
+                    "fontSize": 16,
+                    "color": "#6b7280",
+                    "textAlign": "center"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "css": "body { background: #f3f4f6; font-family: 'Inter', sans-serif; } .dsl-card:hover { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); transition: box-shadow 0.3s ease; }",
+  "responsiveBreakpoints": {
+    "sm": 640,
+    "md": 768,
+    "lg": 1024,
+    "xl": 1280
+  },
+  "metadata": {
+    "tutorial_step": "complete",
+    "difficulty": "advanced",
+    "concepts": ["dashboard design", "grid layouts", "responsive design", "data visualization", "navigation", "cards"]
+  }
+}

@@ -1,0 +1,604 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+        - smoke
+        - unit
+        - integration
+        - performance
+        - security
+        - full
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Smoke tests - fastest feedback
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        
+    - name: Run smoke tests
+      run: |
+        pytest tests/ -m "smoke" \
+          --maxfail=5 \
+          --tb=short \
+          --durations=10 \
+          --junitxml=smoke-results.xml \
+          --cov=src \
+          --cov-report=xml:smoke-coverage.xml
+          
+    - name: Upload smoke test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: smoke-test-results
+        path: |
+          smoke-results.xml
+          smoke-coverage.xml
+
+  # Unit tests with matrix strategy
+  unit-tests:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    needs: smoke-tests
+    timeout-minutes: 20
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Exclude some combinations to reduce job count
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser
+        
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install chromium
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ \
+          --maxfail=10 \
+          --tb=short \
+          --durations=20 \
+          --junitxml=unit-results-${{ matrix.os }}-${{ matrix.python-version }}.xml \
+          --cov=src \
+          --cov-report=xml:unit-coverage-${{ matrix.os }}-${{ matrix.python-version }}.xml \
+          --cov-report=html:htmlcov-${{ matrix.os }}-${{ matrix.python-version }}
+          
+    - name: Upload unit test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: unit-test-results-${{ matrix.os }}-${{ matrix.python-version }}
+        path: |
+          unit-results-*.xml
+          unit-coverage-*.xml
+          htmlcov-*/
+
+  # Integration tests with services
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    timeout-minutes: 45
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser xvfb
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        
+    - name: Set up test environment
+      run: |
+        export DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb
+        export REDIS_URL=redis://localhost:6379/0
+        export TESTING=true
+        
+    - name: Run integration tests
+      run: |
+        xvfb-run -a pytest tests/integration/ \
+          --maxfail=5 \
+          --tb=long \
+          --durations=20 \
+          --junitxml=integration-results.xml \
+          --cov=src \
+          --cov-report=xml:integration-coverage.xml \
+          --cov-append
+          
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          integration-results.xml
+          integration-coverage.xml
+
+  # Performance tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    timeout-minutes: 60
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'performance')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        
+    - name: Run performance tests
+      run: |
+        pytest tests/performance/ \
+          --maxfail=3 \
+          --tb=short \
+          --durations=20 \
+          --junitxml=performance-results.xml \
+          --benchmark-json=performance-benchmark.json \
+          --benchmark-sort=mean
+          
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          performance-results.xml
+          performance-benchmark.json
+          
+    - name: Performance regression check
+      run: |
+        python scripts/check_performance_regression.py \
+          --current performance-benchmark.json \
+          --baseline performance-baseline.json \
+          --threshold 0.1
+
+  # Security tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        pip install bandit safety
+        
+    - name: Run security tests
+      run: |
+        pytest tests/security/ \
+          --maxfail=5 \
+          --tb=short \
+          --junitxml=security-results.xml
+          
+    - name: Run bandit security scanner
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        
+    - name: Run safety dependency scanner
+      run: |
+        safety check --json --output safety-report.json
+        
+    - name: Upload security results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-test-results
+        path: |
+          security-results.xml
+          bandit-report.json
+          safety-report.json
+
+  # Docker container tests
+  docker-tests:
+    name: Docker Container Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build test images
+      run: |
+        docker compose -f docker/docker compose.test.yml build
+        
+    - name: Run container tests
+      run: |
+        docker compose -f docker/docker compose.test.yml up --abort-on-container-exit
+        
+    - name: Extract test results
+      if: always()
+      run: |
+        docker compose -f docker/docker compose.test.yml logs > docker-test-logs.txt
+        docker cp $(docker compose -f docker/docker compose.test.yml ps -q test):/app/test-results.xml ./docker-test-results.xml || true
+        
+    - name: Upload docker test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-test-results
+        path: |
+          docker-test-results.xml
+          docker-test-logs.txt
+
+  # End-to-end tests
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    timeout-minutes: 60
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser xvfb
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        npm install
+        
+    - name: Start application services
+      run: |
+        docker compose -f docker/docker compose.yml up -d
+        
+    - name: Wait for services
+      run: |
+        timeout 300 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+        
+    - name: Run end-to-end tests
+      run: |
+        xvfb-run -a pytest tests/e2e/ \
+          --maxfail=3 \
+          --tb=long \
+          --durations=20 \
+          --junitxml=e2e-results.xml \
+          --html=e2e-report.html
+          
+    - name: Upload e2e test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: e2e-test-results
+        path: |
+          e2e-results.xml
+          e2e-report.html
+          screenshots/
+          
+    - name: Cleanup services
+      if: always()
+      run: |
+        docker compose -f docker/docker compose.yml down -v
+
+  # Test report generation
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs: [smoke-tests, unit-tests, integration-tests, security-tests, docker-tests]
+    if: always()
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: test-artifacts/
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install report dependencies
+      run: |
+        pip install pytest-html coverage[toml] junitparser
+        
+    - name: Merge coverage reports
+      run: |
+        python scripts/merge_coverage_reports.py test-artifacts/
+        
+    - name: Generate combined test report
+      run: |
+        python scripts/generate_test_report.py \
+          --input test-artifacts/ \
+          --output combined-test-report.html \
+          --include-coverage \
+          --include-performance
+          
+    - name: Upload combined test report
+      uses: actions/upload-artifact@v4
+      with:
+        name: combined-test-report
+        path: |
+          combined-test-report.html
+          combined-coverage.xml
+          combined-coverage.html
+          
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: combined-coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read test summary
+          const summaryPath = 'test-artifacts/test-summary.json';
+          if (fs.existsSync(summaryPath)) {
+            const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+            
+            const comment = `## 🧪 Test Results Summary
+            
+            | Test Suite | Status | Tests | Failures | Duration |
+            |------------|--------|-------|----------|----------|
+            | Smoke | ${summary.smoke.status} | ${summary.smoke.total} | ${summary.smoke.failures} | ${summary.smoke.duration}s |
+            | Unit | ${summary.unit.status} | ${summary.unit.total} | ${summary.unit.failures} | ${summary.unit.duration}s |
+            | Integration | ${summary.integration.status} | ${summary.integration.total} | ${summary.integration.failures} | ${summary.integration.duration}s |
+            | Security | ${summary.security.status} | ${summary.security.total} | ${summary.security.failures} | ${summary.security.duration}s |
+            
+            **Coverage:** ${summary.coverage.percentage}%
+            
+            [📊 Detailed Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+
+  # Conditional jobs based on workflow input
+  conditional-tests:
+    name: Conditional Test Execution
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 120
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+        
+    - name: Run selected test level
+      run: |
+        case "${{ github.event.inputs.test_level }}" in
+          "smoke")
+            pytest tests/ -m "smoke" --junitxml=results.xml
+            ;;
+          "unit")
+            pytest tests/unit/ --junitxml=results.xml
+            ;;
+          "integration")
+            pytest tests/integration/ --junitxml=results.xml
+            ;;
+          "performance")
+            pytest tests/performance/ --junitxml=results.xml
+            ;;
+          "security")
+            pytest tests/security/ --junitxml=results.xml
+            ;;
+          "full")
+            pytest tests/ --junitxml=results.xml
+            ;;
+        esac
+        
+    - name: Upload conditional test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: conditional-test-results-${{ github.event.inputs.test_level }}
+        path: results.xml
+
+  # Quality gates
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [test-report]
+    if: always()
+    timeout-minutes: 10
+    
+    steps:
+    - name: Download test report
+      uses: actions/download-artifact@v4
+      with:
+        name: combined-test-report
+        
+    - name: Quality gate evaluation
+      run: |
+        python -c "
+        import json
+        import sys
+        
+        # Load test summary
+        with open('test-summary.json', 'r') as f:
+            summary = json.load(f)
+        
+        # Define quality thresholds
+        min_coverage = 80
+        max_failure_rate = 5
+        
+        # Check coverage
+        coverage = float(summary['coverage']['percentage'])
+        if coverage < min_coverage:
+            print(f'❌ Coverage {coverage}% below threshold {min_coverage}%')
+            sys.exit(1)
+        
+        # Check failure rates
+        total_tests = sum(suite['total'] for suite in summary.values() if isinstance(suite, dict) and 'total' in suite)
+        total_failures = sum(suite['failures'] for suite in summary.values() if isinstance(suite, dict) and 'failures' in suite)
+        failure_rate = (total_failures / total_tests) * 100 if total_tests > 0 else 0
+        
+        if failure_rate > max_failure_rate:
+            print(f'❌ Failure rate {failure_rate:.1f}% above threshold {max_failure_rate}%')
+            sys.exit(1)
+        
+        print(f'✅ Quality gate passed: Coverage {coverage}%, Failure rate {failure_rate:.1f}%')
+        "

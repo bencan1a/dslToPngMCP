@@ -1,0 +1,39 @@
+{
+  "title": "Error Example - Invalid DSL",
+  "description": "This example contains intentional errors for testing validation",
+  "width": "invalid_width",
+  "height": 300,
+  "elements": [
+    {
+      "type": "invalid_type",
+      "id": "bad-element",
+      "layout": {
+        "x": "not_a_number",
+        "y": 50,
+        "width": -100,
+        "height": 50
+      },
+      "style": {
+        "background": "#ff0000",
+        "fontSize": "too_large_size"
+      },
+      "children": [
+        {
+          "type": "text",
+          "text": "This child should cause validation error for invalid_type parent"
+        }
+      ]
+    },
+    {
+      "type": "button",
+      "layout": {
+        "x": 50,
+        "y": 150
+      },
+      "style": {
+        "opacity": 1.5
+      }
+    }
+  ],
+  "css": "body { invalid-css-property: value; }"
+}

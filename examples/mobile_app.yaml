@@ -1,0 +1,248 @@
+title: "Mobile App Layout"
+description: "A responsive mobile app interface design"
+width: 375
+height: 667
+elements:
+  - type: "navbar"
+    id: "mobile-nav"
+    layout:
+      x: 0
+      y: 0
+      width: 375
+      height: 60
+    style:
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+      color: "white"
+      padding: "0 16px"
+      display: "flex"
+      alignItems: "center"
+      justifyContent: "space-between"
+    children:
+      - type: "text"
+        id: "nav-title"
+        layout:
+          x: 0
+          y: 0
+          width: 200
+          height: 60
+        style:
+          fontSize: 18
+          fontWeight: "600"
+          color: "white"
+          display: "flex"
+          alignItems: "center"
+        text: "MyApp"
+      - type: "button"
+        id: "menu-btn"
+        layout:
+          x: 320
+          y: 15
+          width: 40
+          height: 30
+        style:
+          background: "transparent"
+          color: "white"
+          border: "none"
+          fontSize: 18
+        label: "☰"
+
+  - type: "flex"
+    id: "feature-cards"
+    layout:
+      x: 16
+      y: 80
+      width: 343
+      height: 400
+    style:
+      display: "flex"
+      flexDirection: "column"
+      gap: "16px"
+    children:
+      - type: "card"
+        id: "feature-1"
+        layout:
+          x: 0
+          y: 0
+          width: 343
+          height: 120
+        style:
+          background: "white"
+          borderRadius: "16px"
+          padding: "20px"
+          border: "1px solid #f0f0f0"
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)"
+        children:
+          - type: "text"
+            id: "feature-1-title"
+            layout:
+              x: 0
+              y: 0
+              width: 303
+              height: 30
+            style:
+              fontSize: 16
+              fontWeight: "600"
+              color: "#1a1a1a"
+            text: "📱 Mobile Optimized"
+          - type: "text"
+            id: "feature-1-desc"
+            layout:
+              x: 0
+              y: 35
+              width: 303
+              height: 45
+            style:
+              fontSize: 14
+              color: "#666"
+              lineHeight: "1.5"
+            text: "Designed specifically for mobile devices with touch-friendly interactions"
+
+      - type: "card"
+        id: "feature-2"
+        layout:
+          x: 0
+          y: 136
+          width: 343
+          height: 120
+        style:
+          background: "white"
+          borderRadius: "16px"
+          padding: "20px"
+          border: "1px solid #f0f0f0"
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)"
+        children:
+          - type: "text"
+            id: "feature-2-title"
+            layout:
+              x: 0
+              y: 0
+              width: 303
+              height: 30
+            style:
+              fontSize: 16
+              fontWeight: "600"
+              color: "#1a1a1a"
+            text: "⚡ Fast Performance"
+          - type: "text"
+            id: "feature-2-desc"
+            layout:
+              x: 0
+              y: 35
+              width: 303
+              height: 45
+            style:
+              fontSize: 14
+              color: "#666"
+              lineHeight: "1.5"
+            text: "Lightning-fast rendering and smooth animations for the best user experience"
+
+      - type: "card"
+        id: "feature-3"
+        layout:
+          x: 0
+          y: 272
+          width: 343
+          height: 120
+        style:
+          background: "white"
+          borderRadius: "16px"
+          padding: "20px"
+          border: "1px solid #f0f0f0"
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)"
+        children:
+          - type: "text"
+            id: "feature-3-title"
+            layout:
+              x: 0
+              y: 0
+              width: 303
+              height: 30
+            style:
+              fontSize: 16
+              fontWeight: "600"
+              color: "#1a1a1a"
+            text: "🔒 Secure & Private"
+          - type: "text"
+            id: "feature-3-desc"
+            layout:
+              x: 0
+              y: 35
+              width: 303
+              height: 45
+            style:
+              fontSize: 14
+              color: "#666"
+              lineHeight: "1.5"
+            text: "Your data is protected with industry-standard encryption and privacy controls"
+
+  - type: "flex"
+    id: "action-buttons"
+    layout:
+      x: 16
+      y: 500
+      width: 343
+      height: 120
+    style:
+      display: "flex"
+      flexDirection: "column"
+      gap: "12px"
+      justifyContent: "center"
+    children:
+      - type: "button"
+        id: "primary-action"
+        layout:
+          x: 0
+          y: 0
+          width: 343
+          height: 52
+        style:
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+          color: "white"
+          fontSize: 16
+          fontWeight: "600"
+          borderRadius: "26px"
+          border: "none"
+        label: "Get Started"
+        onClick: "startOnboarding()"
+
+      - type: "button"
+        id: "secondary-action"
+        layout:
+          x: 0
+          y: 64
+          width: 343
+          height: 52
+        style:
+          background: "transparent"
+          color: "#667eea"
+          fontSize: 16
+          fontWeight: "500"
+          borderRadius: "26px"
+          border: "2px solid #667eea"
+        label: "Learn More"
+        onClick: "showFeatures()"
+
+css: |
+  body { 
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%); 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+  }
+  .dsl-card:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12); 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+  }
+  .dsl-button:hover { 
+    transform: translateY(-1px); 
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); 
+    transition: all 0.2s ease; 
+  }
+  .dsl-button:active { 
+    transform: translateY(0); 
+  }
+
+responsiveBreakpoints:
+  sm: 640
+  md: 768
+  lg: 1024
+  xl: 1280

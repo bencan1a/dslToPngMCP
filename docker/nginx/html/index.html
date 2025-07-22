@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSL to PNG MCP Server - Development</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+        }
+        .healthy {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .link-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-decoration: none;
+            color: #495057;
+            transition: all 0.2s;
+        }
+        .link-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .link-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .link-desc {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 DSL to PNG MCP Server</h1>
+            <p>Development Environment</p>
+        </div>
+        <div class="content">
+            <div class="status healthy">
+                <span class="icon">✅</span>
+                <span>Nginx reverse proxy is running successfully</span>
+            </div>
+            
+            <div class="info">
+                <span class="icon">ℹ️</span>
+                <span>Environment: <strong>Development</strong> | Version: <strong>1.0.0</strong></span>
+            </div>
+            
+            <div class="links">
+                <a href="/health" class="link-card">
+                    <div class="link-title">🏥 Health Check</div>
+                    <div class="link-desc">System health status</div>
+                </a>
+                
+                <a href="/docs" class="link-card">
+                    <div class="link-title">📚 API Documentation</div>
+                    <div class="link-desc">Interactive API docs</div>
+                </a>
+                
+                <a href="/redoc" class="link-card">
+                    <div class="link-title">📖 ReDoc</div>
+                    <div class="link-desc">Alternative API docs</div>
+                </a>
+                
+                <a href="/static/png/" class="link-card">
+                    <div class="link-title">🖼️ PNG Storage</div>
+                    <div class="link-desc">Generated PNG files</div>
+                </a>
+                
+                <a href="/metrics" class="link-card">
+                    <div class="link-title">📊 Metrics</div>
+                    <div class="link-desc">Performance metrics</div>
+                </a>
+                
+                <a href="/nginx-status" class="link-card">
+                    <div class="link-title">⚙️ Nginx Status</div>
+                    <div class="link-desc">Nginx server status</div>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # Test runner service
+  test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    environment:
+      - TESTING=true
+      - DATABASE_URL=postgresql://testuser:testpass@postgres:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    volumes:
+      - ../tests:/app/tests:ro
+      - ../src:/app/src:ro
+      - ../test-results:/app/test-results
+      - ../test_tmp:/app/test_tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        echo 'Installing Playwright browsers...'
+        playwright install chromium
+        echo 'Running tests...'
+        pytest tests/ 
+          --junitxml=/app/test-results/test-results.xml 
+          --cov=src 
+          --cov-report=xml:/app/test-results/coverage.xml
+          --cov-report=html:/app/test-results/htmlcov
+          --tb=short
+          --maxfail=10
+      "
+
+  # PostgreSQL for testing
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  # Redis for testing
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --save "" --appendonly no
+
+  # Unit tests only
+  unit-test:
+    extends: test
+    command: >
+      bash -c "
+        echo 'Running unit tests...'
+        pytest tests/unit/ 
+          --junitxml=/app/test-results/unit-results.xml 
+          --cov=src 
+          --cov-report=xml:/app/test-results/unit-coverage.xml
+          -m 'not requires_browser and not requires_redis and not requires_postgres'
+      "
+
+  # Integration tests
+  integration-test:
+    extends: test
+    command: >
+      bash -c "
+        echo 'Installing Playwright browsers...'
+        playwright install chromium
+        echo 'Running integration tests...'
+        pytest tests/integration/ 
+          --junitxml=/app/test-results/integration-results.xml 
+          --cov=src 
+          --cov-report=xml:/app/test-results/integration-coverage.xml
+          --tb=long
+      "
+
+  # Performance tests
+  performance-test:
+    extends: test
+    command: >
+      bash -c "
+        echo 'Running performance tests...'
+        pytest tests/performance/ 
+          --junitxml=/app/test-results/performance-results.xml 
+          --benchmark-json=/app/test-results/benchmark.json
+          --tb=short
+      "
+
+  # Security tests
+  security-test:
+    extends: test
+    command: >
+      bash -c "
+        echo 'Running security tests...'
+        pytest tests/security/ 
+          --junitxml=/app/test-results/security-results.xml 
+          --tb=short
+        echo 'Running bandit security scan...'
+        bandit -r src/ -f json -o /app/test-results/bandit-report.json || true
+        echo 'Running safety dependency scan...'
+        safety check --json --output /app/test-results/safety-report.json || true
+      "
+
+volumes:
+  test-results:

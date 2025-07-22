@@ -1,0 +1,28 @@
+{
+  "title": "Simple Button Example",
+  "description": "A basic button demonstration",
+  "width": 400,
+  "height": 200,
+  "elements": [
+    {
+      "type": "button",
+      "id": "primary-btn",
+      "layout": {
+        "x": 150,
+        "y": 80,
+        "width": 100,
+        "height": 40
+      },
+      "style": {
+        "background": "#007bff",
+        "color": "white",
+        "fontSize": 16,
+        "fontWeight": "bold",
+        "borderRadius": "8px"
+      },
+      "label": "Click Me!",
+      "onClick": "handleClick()"
+    }
+  ],
+  "css": ".dsl-button:hover { transform: scale(1.05); transition: transform 0.2s; }"
+}

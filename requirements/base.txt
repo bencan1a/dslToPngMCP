@@ -1,0 +1,54 @@
+# Core Dependencies - Required in all environments
+# ================================================
+
+# Web Framework
+fastapi>=0.104.0,<1.0.0
+uvicorn[standard]>=0.24.0,<1.0.0
+
+# Data Validation and Serialization
+pydantic>=2.5.0,<3.0.0
+pydantic-settings>=2.1.0,<3.0.0
+
+# MCP Protocol
+mcp>=1.0.0,<2.0.0
+
+# Browser Automation
+playwright>=1.40.0,<2.0.0
+
+# Async Task Queue
+celery[redis]>=5.3.0,<6.0.0
+redis>=5.0.0,<6.0.0
+
+# Image Processing
+Pillow>=10.0.0,<11.0.0
+
+# DSL Validation
+cerberus>=1.3.4,<2.0.0
+
+# HTTP Client
+httpx>=0.25.0,<1.0.0
+
+# JSON and Data Processing
+orjson>=3.9.0,<4.0.0
+
+# Async Database Support
+asyncpg>=0.29.0,<1.0.0
+# Async File Operations
+aiofiles>=24.1.0,<25.0.0
+
+
+# HTTP Server for health checks
+aiohttp>=3.9.0,<4.0.0
+
+# Environment and Configuration
+python-dotenv>=1.0.0,<2.0.0
+
+# Date and Time
+python-dateutil>=2.8.0,<3.0.0
+
+# Utilities
+click>=8.1.0,<9.0.0
+
+# Logging
+python-json-logger>=2.0.0,<3.0.0
+structlog>=23.2.0,<24.0.0

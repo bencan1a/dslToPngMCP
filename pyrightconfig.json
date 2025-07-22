@@ -1,0 +1,49 @@
+{
+  "include": ["src"],
+  "exclude": [
+    "tests",
+    "test_tmp",
+    "examples",
+    "docs",
+    "scripts",
+    "docker",
+    "requirements",
+    "backups",
+    "data",
+    "secrets",
+    "test_storage",
+    "**/.git",
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/node_modules",
+    "**/*.egg-info"
+  ],
+  "ignore": [
+    "tests",
+    "test_tmp",
+    "examples",
+    "docs",
+    "scripts",
+    "docker",
+    "requirements",
+    "backups",
+    "data",
+    "secrets",
+    "test_storage"
+  ],
+  "typeCheckingMode": "strict",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.9",
+  "pythonPlatform": "Linux",
+  "executionEnvironments": [
+    {
+      "root": "src",
+      "pythonVersion": "3.9"
+    }
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "stubPath": "typings"
+}

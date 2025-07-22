@@ -1,16 +1,626 @@
-services:
-  render-server:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - BROWSERLESS_ENDPOINT=ws://chrome:3000
+# =============================================================================
+# Docker Compose - Development Environment
+# =============================================================================
+# Multi-container orchestration for DSL to PNG MCP Server
+# Development setup with debugging enabled and hot reloading
+# =============================================================================
 
-  chrome:
-    image: browserless/chrome:latest
-    ports:
-      - "3000:3000"
+version: '3.8'
+
+# =============================================================================
+# SERVICES DEFINITION
+# =============================================================================
+services:
+  
+  # ---------------------------------------------------------------------------
+  # Redis - Cache and Message Queue
+  # ---------------------------------------------------------------------------
+  redis:
+    build:
+      context: ./docker/redis
+      dockerfile: Dockerfile
+    container_name: dsl-redis-dev
+    hostname: redis
+    restart: unless-stopped
+    networks:
+      - backend
+      - browser-network
+    volumes:
+      - redis_data:/data/redis
+      - redis_logs:/var/log/redis
+      - ./docker/redis/redis-dev.conf:/etc/redis/redis.conf:ro
     environment:
-      - PREBOOT_CHROME=true
-      - DEFAULT_BLOCK_ADS=true
-      - MAX_CONCURRENT_SESSIONS=5
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-devpassword}
+    ports:
+      - "6379:6379"  # Exposed for development debugging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # MCP Server - Protocol Handling Service
+  # ---------------------------------------------------------------------------
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: mcp-server
+    container_name: dsl-mcp-server-dev
+    hostname: mcp-server
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    volumes:
+      - ./src:/app/src:ro  # Hot reload for development
+      - mcp_logs:/app/logs
+      - ./docker/config/mcp-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_MCP_HOST=0.0.0.0
+      - DSL_PNG_MCP_PORT=3001
+      - DSL_PNG_LOG_LEVEL=DEBUG
+    ports:
+      - "3001:3001"  # Exposed for development
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 3001)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # FastAPI Server - REST API Service (2 replicas)
+  # ---------------------------------------------------------------------------
+  fastapi-server-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fastapi-server
+    container_name: dsl-fastapi-1-dev
+    hostname: fastapi-server-1
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    networks:
+      - backend
+      - frontend
+    volumes:
+      - ./src:/app/src:ro  # Hot reload for development
+      - fastapi_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/fastapi-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_HOST=0.0.0.0
+      - DSL_PNG_PORT=8000
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - INSTANCE_ID=1
+    expose:
+      - "8000"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  fastapi-server-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fastapi-server
+    container_name: dsl-fastapi-2-dev
+    hostname: fastapi-server-2
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    networks:
+      - backend
+      - frontend
+    volumes:
+      - ./src:/app/src:ro  # Hot reload for development
+      - fastapi_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/fastapi-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_HOST=0.0.0.0
+      - DSL_PNG_PORT=8000
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - INSTANCE_ID=2
+    expose:
+      - "8000"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Celery Workers - Background Task Processing (4 replicas)
+  # ---------------------------------------------------------------------------
+  celery-worker-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: celery-worker
+    container_name: dsl-celery-1-dev
+    hostname: celery-worker-1
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-browsers:
+        condition: service_healthy
+    networks:
+      - backend
+      - browser-network
+    volumes:
+      - ./src:/app/src:ro  # Hot reload for development
+      - celery_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/celery-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - WORKER_ID=1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.core.queue.tasks", "inspect", "ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery-worker-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: celery-worker
+    container_name: dsl-celery-2-dev
+    hostname: celery-worker-2
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-browsers:
+        condition: service_healthy
+    networks:
+      - backend
+      - browser-network
+    volumes:
+      - ./src:/app/src:ro
+      - celery_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/celery-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - WORKER_ID=2
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.core.queue.tasks", "inspect", "ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery-worker-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: celery-worker
+    container_name: dsl-celery-3-dev
+    hostname: celery-worker-3
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-browsers:
+        condition: service_healthy
+    networks:
+      - backend
+      - browser-network
+    volumes:
+      - ./src:/app/src:ro
+      - celery_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/celery-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - WORKER_ID=3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.core.queue.tasks", "inspect", "ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery-worker-4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: celery-worker
+    container_name: dsl-celery-4-dev
+    hostname: celery-worker-4
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-browsers:
+        condition: service_healthy
+    networks:
+      - backend
+      - browser-network
+    volumes:
+      - ./src:/app/src:ro
+      - celery_logs:/app/logs
+      - png_storage:/app/storage
+      - html_temp:/app/tmp
+      - ./docker/config/celery-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_REDIS_URL=redis://:devpassword@redis:6379/0
+      - DSL_PNG_CELERY_BROKER_URL=redis://:devpassword@redis:6379/1
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - WORKER_ID=4
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.core.queue.tasks", "inspect", "ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Playwright Browser Pool Service
+  # ---------------------------------------------------------------------------
+  playwright-browsers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: playwright-browsers
+    container_name: dsl-browsers-dev
+    hostname: playwright-browsers
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - browser-network
+    volumes:
+      - ./src:/app/src:ro
+      - browser_cache:/app/.cache
+      - html_temp:/app/tmp
+      - playwright_logs:/app/logs
+      - ./docker/config/playwright-dev.env:/app/.env:ro
+    environment:
+      - DSL_PNG_ENVIRONMENT=development
+      - DSL_PNG_DEBUG=true
+      - DSL_PNG_PLAYWRIGHT_HEADLESS=true
+      - DSL_PNG_BROWSER_POOL_SIZE=3
+      - DSL_PNG_LOG_LEVEL=DEBUG
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    ports:
+      - "9222:9222"  # Chrome DevTools Protocol (development only)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "python", "-c", "from playwright.async_api import async_playwright; import asyncio; asyncio.run(async_playwright().start())"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy and Load Balancer
+  # ---------------------------------------------------------------------------
+  nginx-proxy:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: dsl-nginx-dev
+    hostname: nginx-proxy
+    restart: unless-stopped
+    depends_on:
+      fastapi-server-1:
+        condition: service_healthy
+      fastapi-server-2:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - nginx_logs:/var/log/nginx
+      - png_storage:/var/www/static/png:ro  # Serve PNG files directly
+      - ./docker/nginx/conf.d/dev.conf:/etc/nginx/conf.d/dev.conf:ro
+      - ./docker/nginx/html:/var/www/html:ro
+      # Disable conflicting config files by mounting empty files
+      - /dev/null:/etc/nginx/conf.d/prod.conf:ro
+      - /dev/null:/etc/nginx/conf.d/locations.conf:ro
+      - /dev/null:/etc/nginx/conf.d/upstream.conf:ro
+      # dev.conf includes locations.conf and nginx.conf defines upstreams
+    environment:
+      - NGINX_ENV=development
+      - BACKEND_SERVERS=fastapi-server-1:8000,fastapi-server-2:8000
+    ports:
+      - "80:80"    # HTTP
+      - "443:443"  # HTTPS (development with self-signed cert)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# NETWORKS DEFINITION
+# =============================================================================
+networks:
+  frontend:
+    driver: bridge
+    name: dsl-frontend-dev
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+
+  backend:
+    driver: bridge
+    name: dsl-backend-dev
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/24
+          gateway: 172.21.0.1
+
+  browser-network:
+    driver: bridge
+    name: dsl-browser-dev
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/24
+          gateway: 172.22.0.1
+
+# =============================================================================
+# VOLUMES DEFINITION
+# =============================================================================
+volumes:
+  # Persistent volumes
+  png_storage:
+    name: dsl-png-storage-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/storage/png
+
+  redis_data:
+    name: dsl-redis-data-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/redis
+
+  nginx_logs:
+    name: dsl-nginx-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/nginx
+
+  # Temporary volumes
+  html_temp:
+    name: dsl-html-temp-dev
+    driver: local
+
+  browser_cache:
+    name: dsl-browser-cache-dev
+    driver: local
+
+  # Log volumes
+  mcp_logs:
+    name: dsl-mcp-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/mcp
+
+  fastapi_logs:
+    name: dsl-fastapi-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/fastapi
+
+  celery_logs:
+    name: dsl-celery-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/celery
+
+  playwright_logs:
+    name: dsl-playwright-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/playwright
+
+  redis_logs:
+    name: dsl-redis-logs-dev
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/redis
