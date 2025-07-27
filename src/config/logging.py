@@ -9,17 +9,20 @@ Uses structlog for structured logging with JSON output in production.
 import logging
 import logging.config
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, TYPE_CHECKING
 import structlog
 from structlog.types import Processor
 
 from .settings import get_settings
 
+if TYPE_CHECKING:
+    from .settings import Settings
+
 
 def setup_logging() -> None:
     """Setup application logging configuration."""
     settings = get_settings()
-    
+
     # Configure structlog
     processors: list[Processor] = [
         structlog.stdlib.filter_by_level,
@@ -30,27 +33,27 @@ def setup_logging() -> None:
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
-    
+
     if settings.environment == "production":
         # JSON output for production
         processors.append(structlog.processors.JSONRenderer())
     else:
         # Pretty output for development
         processors.append(structlog.dev.ConsoleRenderer(colors=True))
-    
+
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
-    
+
     # Configure standard library logging
     logging_config = get_logging_config(settings)
     logging.config.dictConfig(logging_config)
 
 
-def get_logging_config(settings) -> Dict[str, Any]:
+def get_logging_config(settings: "Settings") -> Dict[str, Any]:
     """Get logging configuration dictionary."""
     return {
         "version": 1,
@@ -96,7 +99,11 @@ def get_logging_config(settings) -> Dict[str, Any]:
         "loggers": {
             "": {  # Root logger
                 "level": settings.log_level,
-                "handlers": ["console", "file", "error_file"] if settings.environment != "testing" else ["console"],
+                "handlers": (
+                    ["console", "file", "error_file"]
+                    if settings.environment != "testing"
+                    else ["console"]
+                ),
                 "propagate": False,
             },
             "uvicorn": {

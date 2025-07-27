@@ -160,7 +160,7 @@ exclude = [
     "^data/",
     "^secrets/",
     "^test_storage/",
-    "^\..*",
+    "^\\..*",
 ]
 
 [[tool.mypy.overrides]]
@@ -197,12 +197,18 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
     "smoke: Quick smoke tests for basic functionality",
-    "unit: Unit tests for individual components",
+    "unit: Unit tests for individual components", 
     "integration: Integration tests for component interactions",
     "performance: Performance and load testing",
     "security: Security and vulnerability tests",
     "e2e: End-to-end tests",
+    "e2e_sse: SSE-specific end-to-end tests",
+    "e2e_pipeline: Complete pipeline end-to-end tests",
     "slow: Tests that take a long time to run",
+    "api: API tests for HTTP endpoints",
+    "mcp: MCP protocol tests",
+    "docker: Docker deployment tests",
+    "sse: Server-Sent Events tests",
     "requires_browser: Tests that require browser automation",
     "requires_redis: Tests that require Redis connection",
     "requires_postgres: Tests that require PostgreSQL connection",
@@ -215,9 +221,10 @@ timeout = 300
 filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
-    "ignore:.*unclosed.*:ResourceWarning",
-    "ignore:.*coroutine.*was never awaited:RuntimeWarning",
+    "ignore::PytestUnknownMarkWarning",
+    "ignore::PytestCacheWarning",
+    "ignore::pydantic._internal._config:PydanticDeprecatedSince20",
+    "ignore::pytest_asyncio.plugin:DeprecationWarning",
 ]
 log_cli = true
 log_cli_level = "INFO"

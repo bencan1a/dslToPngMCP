@@ -6,7 +6,7 @@ Tool implementations for the MCP (Model Context Protocol) server.
 Provides DSL to PNG conversion, status, and health check tools.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 import json
 
 from src.config.logging import get_logger
@@ -20,57 +20,66 @@ logger = get_logger(__name__)
 
 class DSLToPNGTool:
     """Tool for converting DSL to PNG images."""
-    
-    def __init__(self):
-        self.logger = logger.bind(tool="dsl_to_png")
-    
+
+    def __init__(self) -> None:
+        self.logger: Any = logger.bind(tool="dsl_to_png")  # structlog.BoundLoggerBase
+
     async def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute DSL to PNG conversion.
-        
+
         Args:
             arguments: Tool arguments containing DSL and options
-            
+
         Returns:
             Result dictionary with PNG data or error
         """
         try:
             dsl_content = arguments.get("dsl")
             options = arguments.get("options", {})
-            
+
             if not dsl_content:
                 return {"success": False, "error": "DSL content is required"}
-            
+
             # Convert to render options
             render_options = RenderOptions(
                 width=options.get("width", 800),
                 height=options.get("height", 600),
-                device_scale_factor=options.get("device_scale_factor", 1.0)
+                device_scale_factor=options.get("device_scale_factor", 1.0),
+                user_agent=options.get("user_agent"),
+                wait_for_load=options.get("wait_for_load", True),
+                full_page=options.get("full_page", False),
+                png_quality=options.get("png_quality"),
+                optimize_png=options.get("optimize_png", True),
+                timeout=options.get("timeout", 30),
+                block_resources=options.get("block_resources", False),
+                background_color=options.get("background_color"),
+                transparent_background=options.get("transparent_background", False),
             )
-            
+
             # Parse DSL
             parse_result = await parse_dsl(json.dumps(dsl_content))
-            
-            if not parse_result.success:
+
+            if not parse_result.success or parse_result.document is None:
                 return {
                     "success": False,
-                    "error": f"DSL parsing failed: {'; '.join(parse_result.errors)}"
+                    "error": f"DSL parsing failed: {'; '.join(parse_result.errors)}",
                 }
-            
+
             # Generate HTML
             html_content = await generate_html(parse_result.document, render_options)
-            
+
             # Generate PNG
             png_result = await generate_png_from_html(html_content, render_options)
-            
+
             return {
                 "success": True,
                 "png_data": png_result.base64_data,
                 "width": png_result.width,
                 "height": png_result.height,
-                "file_size": png_result.file_size
+                "file_size": png_result.file_size,
             }
-            
+
         except Exception as e:
             self.logger.error("DSL to PNG tool failed", error=str(e))
             return {"success": False, "error": str(e)}
@@ -78,17 +87,17 @@ class DSLToPNGTool:
 
 class StatusTool:
     """Tool for getting system status information."""
-    
-    def __init__(self):
-        self.logger = logger.bind(tool="status")
-    
+
+    def __init__(self) -> None:
+        self.logger: Any = logger.bind(tool="status")  # structlog.BoundLoggerBase
+
     async def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute status check.
-        
+
         Args:
             arguments: Tool arguments
-            
+
         Returns:
             System status information
         """
@@ -100,7 +109,7 @@ class StatusTool:
                 "completed_tasks": 0,
                 "failed_tasks": 0,
                 "storage_usage": {"hot": "0MB", "warm": "0MB"},
-                "uptime": 0
+                "uptime": 0,
             }
         except Exception as e:
             self.logger.error("Status tool failed", error=str(e))
@@ -109,39 +118,39 @@ class StatusTool:
 
 class HealthTool:
     """Tool for health check operations."""
-    
-    def __init__(self):
-        self.logger = logger.bind(tool="health")
-    
+
+    def __init__(self) -> None:
+        self.logger: Any = logger.bind(tool="health")  # structlog.BoundLoggerBase
+
     async def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute health check.
-        
+
         Args:
             arguments: Tool arguments
-            
+
         Returns:
             Health status information
         """
         try:
             detailed = arguments.get("detailed", False)
-            
-            result = {
+
+            result: Dict[str, Any] = {
                 "success": True,
                 "status": "healthy",
                 "timestamp": "2023-01-01T12:00:00Z",
-                "version": "1.0.0"
+                "version": "1.0.0",
             }
-            
+
             if detailed:
                 result["components"] = {
                     "database": {"status": "healthy", "response_time": 0.001},
                     "storage": {"status": "healthy", "free_space": "10GB"},
-                    "browser_pool": {"status": "healthy", "active_browsers": 2}
+                    "browser_pool": {"status": "healthy", "active_browsers": 2},
                 }
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error("Health tool failed", error=str(e))
             return {"success": False, "error": str(e)}
@@ -155,18 +164,20 @@ async def render_dsl_to_png(dsl_data: Dict[str, Any], options: Dict[str, Any]) -
     """
     tool = DSLToPNGTool()
     result = await tool.execute({"dsl": dsl_data, "options": options})
-    
+
     if not result.get("success"):
         raise Exception(result.get("error", "Unknown error"))
-    
+
     # Create a mock PNGResult for compatibility
     from src.models.schemas import PNGResult
+
     return PNGResult(
+        png_data=b"mock_png_data",  # Mock binary data
         base64_data=result["png_data"],
         width=result["width"],
         height=result["height"],
         file_size=result["file_size"],
-        metadata={}
+        metadata={},
     )
 
 

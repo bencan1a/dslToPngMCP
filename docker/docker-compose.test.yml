@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Test runner service
   test:
@@ -14,6 +12,7 @@ services:
     volumes:
       - ../tests:/app/tests:ro
       - ../src:/app/src:ro
+      - ../debug_scripts:/app/debug_scripts:ro
       - ../test-results:/app/test-results
       - ../test_tmp:/app/test_tmp
     depends_on:
@@ -43,7 +42,7 @@ services:
       POSTGRES_PASSWORD: testpass
       POSTGRES_DB: testdb
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      test: [ "CMD-SHELL", "pg_isready -U testuser -d testdb" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -54,7 +53,7 @@ services:
   redis:
     image: redis:7-alpine
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5

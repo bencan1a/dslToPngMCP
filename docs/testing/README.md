@@ -33,6 +33,9 @@ This document provides comprehensive guidance for the DSL to PNG conversion syst
 # Install dependencies
 pip install -r requirements/dev.txt
 
+#activate venv
+source ./bin/activate
+
 # Run all tests
 pytest
 

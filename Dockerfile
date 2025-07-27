@@ -140,13 +140,13 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run FastAPI server with Gunicorn in production
 CMD ["gunicorn", "src.api.main:app", \
-     "--workers", "2", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "300", \
-     "--keep-alive", "5", \
-     "--max-requests", "1000", \
-     "--max-requests-jitter", "100"]
+    "--workers", "2", \
+    "--worker-class", "uvicorn.workers.UvicornWorker", \
+    "--bind", "0.0.0.0:8000", \
+    "--timeout", "300", \
+    "--keep-alive", "5", \
+    "--max-requests", "1000", \
+    "--max-requests-jitter", "100"]
 
 # -----------------------------------------------------------------------------
 # Stage 9: Celery Worker Service
@@ -159,11 +159,11 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
 
 # Run Celery worker
 CMD ["celery", "-A", "src.core.queue.tasks", "worker", \
-     "--loglevel=info", \
-     "--concurrency=2", \
-     "--max-tasks-per-child=100", \
-     "--time-limit=300", \
-     "--soft-time-limit=270"]
+    "--loglevel=info", \
+    "--concurrency=2", \
+    "--max-tasks-per-child=100", \
+    "--time-limit=300", \
+    "--soft-time-limit=270"]
 
 # -----------------------------------------------------------------------------
 # Stage 10: Playwright Browser Pool Service
@@ -181,11 +181,11 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
 HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
     CMD python -c "from playwright.async_api import async_playwright; import asyncio; asyncio.run(async_playwright().start())" || exit 1
 
-# Run browser pool service (custom script)
-CMD ["python", "-c", "\
-import asyncio; \
-from src.core.rendering.png_generator import run_browser_pool; \
-asyncio.run(run_browser_pool())"]
+# Run browser service HTTP API server
+CMD ["uvicorn", "src.core.rendering.browser_service_api:app", \
+    "--host", "0.0.0.0", \
+    "--port", "8080", \
+    "--workers", "1"]
 
 # -----------------------------------------------------------------------------
 # Stage 11: Development Build
@@ -219,9 +219,9 @@ ARG VCS_REF
 ARG VERSION=1.0.0
 
 LABEL org.label-schema.build-date=$BUILD_DATE \
-      org.label-schema.name="dsl-to-png-mcp" \
-      org.label-schema.description="DSL to PNG conversion service with MCP protocol" \
-      org.label-schema.version=$VERSION \
-      org.label-schema.vcs-ref=$VCS_REF \
-      org.label-schema.schema-version="1.0" \
-      maintainer="DSL PNG Team"
+    org.label-schema.name="dsl-to-png-mcp" \
+    org.label-schema.description="DSL to PNG conversion service with MCP protocol" \
+    org.label-schema.version=$VERSION \
+    org.label-schema.vcs-ref=$VCS_REF \
+    org.label-schema.schema-version="1.0" \
+    maintainer="DSL PNG Team"

@@ -6,14 +6,13 @@ Playwright-based PNG screenshot generation from HTML content.
 Manages browser instances, viewport configuration, and image optimization.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, AsyncGenerator
 import asyncio
-from pathlib import Path
 import base64
 from contextlib import asynccontextmanager
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
-from PIL import Image
+from PIL import Image  # type: ignore
 import io
 
 from src.config.logging import get_logger
@@ -25,60 +24,61 @@ logger = get_logger(__name__)
 
 class PNGGenerationError(Exception):
     """Exception raised when PNG generation fails."""
+
     pass
 
 
 class BrowserPool:
     """Browser instance pool for efficient resource management."""
-    
+
     def __init__(self, pool_size: int = 5):
         self.pool_size = pool_size
         self.browsers: List[Browser] = []
         self._semaphore = asyncio.Semaphore(pool_size)
         self._playwright = None
         self.settings = get_settings()
-        self.logger = logger.bind(component="browser_pool")
-    
+        self.logger: Any = logger.bind(component="browser_pool")  # structlog.BoundLoggerBase
+
     async def initialize(self) -> None:
         """Initialize browser pool."""
         try:
             self._playwright = await async_playwright().start()
-            
-            for i in range(self.pool_size):
+
+            for _ in range(self.pool_size):
                 browser = await self._playwright.chromium.launch(
                     headless=self.settings.playwright_headless,
                     args=[
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-web-security',
-                        '--disable-features=VizDisplayCompositor'
-                    ]
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-web-security",
+                        "--disable-features=VizDisplayCompositor",
+                    ],
                 )
                 self.browsers.append(browser)
-            
+
             self.logger.info("Browser pool initialized", pool_size=self.pool_size)
         except Exception as e:
             self.logger.error("Failed to initialize browser pool", error=str(e))
             raise PNGGenerationError(f"Browser pool initialization failed: {e}")
-    
+
     async def close(self) -> None:
         """Close all browsers in the pool."""
         for browser in self.browsers:
             await browser.close()
-        
+
         if self._playwright:
             await self._playwright.stop()
-        
+
         self.logger.info("Browser pool closed")
-    
+
     @asynccontextmanager
-    async def get_browser(self):
+    async def get_browser(self) -> AsyncGenerator[Browser, None]:
         """Get a browser instance from the pool."""
         async with self._semaphore:
             if not self.browsers:
                 raise PNGGenerationError("Browser pool not initialized")
-            
+
             browser = self.browsers.pop()
             try:
                 yield browser
@@ -88,206 +88,220 @@ class BrowserPool:
 
 class PlaywrightPNGGenerator:
     """Playwright-based PNG generator implementation."""
-    
+
     def __init__(self, browser_pool: Optional[BrowserPool] = None):
         self.settings = get_settings()
-        self.logger = logger.bind(generator="playwright")
+        self.logger: Any = logger.bind(generator="playwright")  # structlog.BoundLoggerBase
         self.browser_pool = browser_pool
         self._own_pool = browser_pool is None
-        
+
         if self._own_pool:
             self.browser_pool = BrowserPool(self.settings.browser_pool_size)
-    
+
     async def initialize(self) -> None:
         """Initialize the PNG generator."""
-        if self._own_pool:
+        if self._own_pool and self.browser_pool:
             await self.browser_pool.initialize()
         self.logger.info("PNG generator initialized")
-    
+
     async def close(self) -> None:
         """Close the PNG generator."""
-        if self._own_pool:
+        if self._own_pool and self.browser_pool:
             await self.browser_pool.close()
         self.logger.info("PNG generator closed")
-    
+
     async def generate_png(self, html_content: str, options: RenderOptions) -> PNGResult:
         """
         Generate PNG from HTML content.
-        
+
         Args:
             html_content: HTML content to render
             options: Rendering options
-            
+
         Returns:
             PNGResult containing PNG data and metadata
-            
+
         Raises:
             PNGGenerationError: If PNG generation fails
         """
         try:
-            self.logger.info("Generating PNG from HTML", 
-                           html_length=len(html_content),
-                           width=options.width,
-                           height=options.height)
-            
+            self.logger.info(
+                "Generating PNG from HTML",
+                html_length=len(html_content),
+                width=options.width,
+                height=options.height,
+            )
+
+            if not self.browser_pool:
+                raise PNGGenerationError("Browser pool not available")
+
             async with self.browser_pool.get_browser() as browser:
                 context = await self._create_browser_context(browser, options)
-                
+
                 try:
                     page = await context.new_page()
-                    
+
                     # Configure page
                     await self._configure_page(page, options)
-                    
+
                     # Set HTML content
                     await page.set_content(html_content, wait_until="domcontentloaded")
-                    
+
                     # Wait for any additional loading
                     if options.wait_for_load:
                         await page.wait_for_load_state("networkidle")
-                    
+
                     # Take screenshot
                     screenshot_bytes = await page.screenshot(
                         type="png",
                         full_page=options.full_page,
-                        clip={
-                            "x": 0,
-                            "y": 0,
-                            "width": options.width,
-                            "height": options.height
-                        } if not options.full_page else None
+                        clip=(
+                            {"x": 0, "y": 0, "width": options.width, "height": options.height}
+                            if not options.full_page
+                            else None
+                        ),
                     )
-                    
+
                     # Process image if needed
                     if options.optimize_png:
                         screenshot_bytes = await self._optimize_png(screenshot_bytes, options)
-                    
+
                     # Prepare result
                     result = PNGResult(
                         png_data=screenshot_bytes,
-                        base64_data=base64.b64encode(screenshot_bytes).decode('utf-8'),
+                        base64_data=base64.b64encode(screenshot_bytes).decode("utf-8"),
                         width=options.width,
                         height=options.height,
                         file_size=len(screenshot_bytes),
                         metadata={
                             "generator": "playwright",
                             "optimization": options.optimize_png,
-                            "full_page": options.full_page
-                        }
+                            "full_page": options.full_page,
+                        },
                     )
-                    
-                    self.logger.info("PNG generation completed",
-                                   file_size=result.file_size,
-                                   optimized=options.optimize_png)
-                    
+
+                    self.logger.info(
+                        "PNG generation completed",
+                        file_size=result.file_size,
+                        optimized=options.optimize_png,
+                    )
+
                     return result
-                    
+
                 finally:
                     await context.close()
-        
+
         except Exception as e:
             error_msg = f"PNG generation failed: {e}"
             self.logger.error("PNG generation error", error=error_msg)
             raise PNGGenerationError(error_msg)
-    
-    async def _create_browser_context(self, browser: Browser, options: RenderOptions) -> BrowserContext:
+
+    async def _create_browser_context(
+        self, browser: Browser, options: RenderOptions
+    ) -> BrowserContext:
         """Create browser context with appropriate settings."""
-        context_options = {
-            "viewport": {
-                "width": options.width,
-                "height": options.height
-            },
+        context_options: Dict[str, Any] = {
+            "viewport": {"width": options.width, "height": options.height},
             "device_scale_factor": options.device_scale_factor,
-            "user_agent": options.user_agent if options.user_agent else None,
         }
-        
-        return await browser.new_context(**context_options)
-    
+
+        # Only add user_agent if it's provided
+        if options.user_agent:
+            context_options["user_agent"] = options.user_agent
+
+        return await browser.new_context(**context_options)  # type: ignore[arg-type]
+
     async def _configure_page(self, page: Page, options: RenderOptions) -> None:
         """Configure page settings."""
         # Set timeout
         page.set_default_timeout(self.settings.playwright_timeout)
-        
+
         # Block unnecessary resources if requested
         if options.block_resources:
-            await page.route("**/*", self._handle_route)
-    
-    async def _handle_route(self, route) -> None:
+            await page.route("**/*", self._handle_route)  # type: ignore[arg-type]
+
+    async def _handle_route(self, route: Any) -> None:  # type: ignore[misc]
         """Handle resource blocking."""
-        resource_type = route.request.resource_type
-        
+        resource_type = route.request.resource_type  # type: ignore[attr-defined]
+
         # Block images, fonts, and other non-essential resources for faster rendering
         if resource_type in ["image", "font", "media", "other"]:
-            await route.abort()
+            await route.abort()  # type: ignore[attr-defined]
         else:
-            await route.continue_()
-    
+            await route.continue_()  # type: ignore[attr-defined]
+
     async def _optimize_png(self, png_bytes: bytes, options: RenderOptions) -> bytes:
         """
         Optimize PNG image using PIL.
-        
+
         Args:
             png_bytes: Original PNG bytes
             options: Rendering options
-            
+
         Returns:
             Optimized PNG bytes
         """
         try:
             # Load image with PIL
-            image = Image.open(io.BytesIO(png_bytes))
-            
+            image = Image.open(io.BytesIO(png_bytes))  # type: ignore[attr-defined]
+
             # Apply transparency background if requested
             if options.transparent_background:
                 # Convert to RGBA if not already
-                if image.mode != 'RGBA':
-                    image = image.convert('RGBA')
-                
+                if image.mode != "RGBA":  # type: ignore[attr-defined]
+                    image = image.convert("RGBA")  # type: ignore[attr-defined]
+
                 # Make white pixels transparent
-                data = image.getdata()
-                new_data = []
-                for item in data:
+                data = image.getdata()  # type: ignore[attr-defined]
+                new_data = []  # type: ignore[var-annotated]
+                for item in data:  # type: ignore[attr-defined]
                     # Replace white (or near-white) with transparent
-                    if item[0] > 240 and item[1] > 240 and item[2] > 240:
-                        new_data.append((255, 255, 255, 0))  # Transparent
+                    if item[0] > 240 and item[1] > 240 and item[2] > 240:  # type: ignore[misc]
+                        new_data.append(  # type: ignore[attr-defined]
+                            (255, 255, 255, 0)
+                        )  # Transparent
                     else:
-                        new_data.append(item)
-                image.putdata(new_data)
-            
+                        new_data.append(item)  # type: ignore[attr-defined]
+                image.putdata(new_data)  # type: ignore[attr-defined]
+
             # Apply quality reduction if specified
             if options.png_quality and options.png_quality < 100:
                 # Reduce color palette for smaller file size
-                if image.mode == 'RGBA':
+                if image.mode == "RGBA":  # type: ignore[attr-defined]
                     # Convert to palette mode with transparency
-                    image = image.quantize(colors=256, method=Image.MEDIANCUT)
-                elif image.mode == 'RGB':
+                    image = image.quantize(colors=256, method=Image.MEDIANCUT)  # type: ignore[attr-defined]
+                elif image.mode == "RGB":  # type: ignore[attr-defined]
                     # Convert to palette mode
-                    image = image.quantize(colors=min(256, int(256 * options.png_quality / 100)))
-            
+                    image = image.quantize(colors=min(256, int(256 * options.png_quality / 100)))  # type: ignore[attr-defined]
+
             # Save optimized image
             output = io.BytesIO()
             save_kwargs = {
-                'format': 'PNG',
-                'optimize': True,
-                'compress_level': 9 if options.optimize_png else 6
+                "format": "PNG",
+                "optimize": True,
+                "compress_level": 9 if options.optimize_png else 6,
             }
-            
+
             # Add transparency support
-            if image.mode in ('RGBA', 'LA'):
-                save_kwargs['transparency'] = 0
-            
-            image.save(output, **save_kwargs)
+            if image.mode in ("RGBA", "LA"):  # type: ignore[attr-defined]
+                save_kwargs["transparency"] = 0
+
+            image.save(output, **save_kwargs)  # type: ignore[attr-defined]
             optimized_bytes = output.getvalue()
-            
-            reduction = (1 - len(optimized_bytes) / len(png_bytes)) * 100 if len(png_bytes) > 0 else 0
-            
-            self.logger.debug("PNG optimization completed",
-                            original_size=len(png_bytes),
-                            optimized_size=len(optimized_bytes),
-                            reduction_percent=round(reduction, 2))
-            
+
+            reduction = (
+                (1 - len(optimized_bytes) / len(png_bytes)) * 100 if len(png_bytes) > 0 else 0
+            )
+
+            self.logger.debug(
+                "PNG optimization completed",
+                original_size=len(png_bytes),
+                optimized_size=len(optimized_bytes),
+                reduction_percent=round(reduction, 2),
+            )
+
             return optimized_bytes
-            
+
         except Exception as e:
             self.logger.warning("PNG optimization failed, using original", error=str(e))
             return png_bytes
@@ -295,57 +309,57 @@ class PlaywrightPNGGenerator:
 
 class AdvancedPNGGenerator(PlaywrightPNGGenerator):
     """Advanced PNG generator with device emulation and performance monitoring."""
-    
+
     def __init__(self, browser_pool: Optional[BrowserPool] = None):
         super().__init__(browser_pool)
         self.performance_metrics = {}
         self.device_presets = self._setup_device_presets()
-    
+
     def _setup_device_presets(self) -> Dict[str, Dict[str, Any]]:
         """Setup device emulation presets."""
         return {
-            'desktop': {
-                'viewport': {'width': 1920, 'height': 1080},
-                'device_scale_factor': 1.0,
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            "desktop": {
+                "viewport": {"width": 1920, "height": 1080},
+                "device_scale_factor": 1.0,
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             },
-            'tablet': {
-                'viewport': {'width': 768, 'height': 1024},
-                'device_scale_factor': 2.0,
-                'user_agent': 'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15'
+            "tablet": {
+                "viewport": {"width": 768, "height": 1024},
+                "device_scale_factor": 2.0,
+                "user_agent": "Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15",
             },
-            'mobile': {
-                'viewport': {'width': 375, 'height': 667},
-                'device_scale_factor': 3.0,
-                'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15'
-            }
+            "mobile": {
+                "viewport": {"width": 375, "height": 667},
+                "device_scale_factor": 3.0,
+                "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15",
+            },
         }
-    
-    async def generate_png_with_device_emulation(self, html_content: str,
-                                               options: RenderOptions,
-                                               device_type: str = 'desktop') -> PNGResult:
+
+    async def generate_png_with_device_emulation(
+        self, html_content: str, options: RenderOptions, device_type: str = "desktop"
+    ) -> PNGResult:
         """
         Generate PNG with device emulation.
-        
+
         Args:
             html_content: HTML content to render
             options: Rendering options
             device_type: Device type ('desktop', 'tablet', 'mobile')
-            
+
         Returns:
             PNGResult with device-specific rendering
         """
         if device_type not in self.device_presets:
-            device_type = 'desktop'
-        
+            device_type = "desktop"
+
         device_config = self.device_presets[device_type]
-        
+
         # Override options with device config
         enhanced_options = RenderOptions(
-            width=device_config['viewport']['width'],
-            height=device_config['viewport']['height'],
-            device_scale_factor=device_config['device_scale_factor'],
-            user_agent=device_config['user_agent'],
+            width=device_config["viewport"]["width"],
+            height=device_config["viewport"]["height"],
+            device_scale_factor=device_config["device_scale_factor"],
+            user_agent=device_config["user_agent"],
             wait_for_load=options.wait_for_load,
             full_page=options.full_page,
             png_quality=options.png_quality,
@@ -353,155 +367,166 @@ class AdvancedPNGGenerator(PlaywrightPNGGenerator):
             timeout=options.timeout,
             block_resources=options.block_resources,
             background_color=options.background_color,
-            transparent_background=options.transparent_background
+            transparent_background=options.transparent_background,
         )
-        
+
         result = await self.generate_png(html_content, enhanced_options)
-        result.metadata['device_type'] = device_type
-        result.metadata['device_config'] = device_config
-        
+        result.metadata["device_type"] = device_type
+        result.metadata["device_config"] = device_config
+
         return result
-    
-    async def generate_responsive_screenshots(self, html_content: str,
-                                            base_options: RenderOptions) -> Dict[str, PNGResult]:
+
+    async def generate_responsive_screenshots(
+        self, html_content: str, base_options: RenderOptions
+    ) -> Dict[str, PNGResult]:
         """
         Generate screenshots for multiple device types.
-        
+
         Args:
             html_content: HTML content to render
             base_options: Base rendering options
-            
+
         Returns:
             Dictionary mapping device types to PNG results
         """
-        results = {}
-        
+        results: Dict[str, PNGResult] = {}
+
         for device_type in self.device_presets.keys():
             try:
                 result = await self.generate_png_with_device_emulation(
                     html_content, base_options, device_type
                 )
                 results[device_type] = result
-                
-                self.logger.info("Generated responsive screenshot",
-                               device_type=device_type,
-                               file_size=result.file_size)
-                
+
+                self.logger.info(
+                    "Generated responsive screenshot",
+                    device_type=device_type,
+                    file_size=result.file_size,
+                )
+
             except Exception as e:
-                self.logger.error("Failed to generate responsive screenshot",
-                                device_type=device_type, error=str(e))
-        
+                self.logger.error(
+                    "Failed to generate responsive screenshot",
+                    device_type=device_type,
+                    error=str(e),
+                )
+
         return results
-    
-    async def capture_element_screenshot(self, html_content: str, options: RenderOptions,
-                                       element_selector: str) -> Optional[PNGResult]:
+
+    async def capture_element_screenshot(
+        self, html_content: str, options: RenderOptions, element_selector: str
+    ) -> Optional[PNGResult]:
         """
         Capture screenshot of specific element.
-        
+
         Args:
             html_content: HTML content to render
             options: Rendering options
             element_selector: CSS selector for target element
-            
+
         Returns:
             PNGResult for the specific element or None if element not found
         """
         try:
+            if not self.browser_pool:
+                raise PNGGenerationError("Browser pool not available")
+
             async with self.browser_pool.get_browser() as browser:
                 context = await self._create_browser_context(browser, options)
-                
+
                 try:
                     page = await context.new_page()
                     await self._configure_page(page, options)
                     await page.set_content(html_content, wait_until="domcontentloaded")
-                    
+
                     if options.wait_for_load:
                         await page.wait_for_load_state("networkidle")
-                    
+
                     # Wait for element to be visible
                     element = await page.wait_for_selector(element_selector, timeout=5000)
-                    
+
                     if not element:
                         self.logger.warning("Element not found", selector=element_selector)
                         return None
-                    
+
                     # Take element screenshot
                     screenshot_bytes = await element.screenshot(type="png")
-                    
+
                     if options.optimize_png:
                         screenshot_bytes = await self._optimize_png(screenshot_bytes, options)
-                    
+
                     # Get element bounding box for dimensions
                     bounding_box = await element.bounding_box()
-                    
+
                     result = PNGResult(
                         png_data=screenshot_bytes,
-                        base64_data=base64.b64encode(screenshot_bytes).decode('utf-8'),
-                        width=int(bounding_box['width']) if bounding_box else options.width,
-                        height=int(bounding_box['height']) if bounding_box else options.height,
+                        base64_data=base64.b64encode(screenshot_bytes).decode("utf-8"),
+                        width=int(bounding_box["width"]) if bounding_box else options.width,
+                        height=int(bounding_box["height"]) if bounding_box else options.height,
                         file_size=len(screenshot_bytes),
                         metadata={
-                            'generator': 'playwright_element',
-                            'element_selector': element_selector,
-                            'bounding_box': bounding_box,
-                            'optimization': options.optimize_png
-                        }
+                            "generator": "playwright_element",
+                            "element_selector": element_selector,
+                            "bounding_box": bounding_box,
+                            "optimization": options.optimize_png,
+                        },
                     )
-                    
+
                     return result
-                    
+
                 finally:
                     await context.close()
-                    
+
         except Exception as e:
-            self.logger.error("Element screenshot failed",
-                            selector=element_selector, error=str(e))
+            self.logger.error("Element screenshot failed", selector=element_selector, error=str(e))
             return None
-    
+
     async def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics."""
         return {
-            'browser_pool_size': len(self.browser_pool.browsers) if self.browser_pool else 0,
-            'active_contexts': getattr(self, '_active_contexts', 0),
-            'total_screenshots': getattr(self, '_total_screenshots', 0),
-            'average_generation_time': getattr(self, '_avg_generation_time', 0.0),
-            'memory_usage': self._get_memory_usage()
+            "browser_pool_size": len(self.browser_pool.browsers) if self.browser_pool else 0,
+            "active_contexts": getattr(self, "_active_contexts", 0),
+            "total_screenshots": getattr(self, "_total_screenshots", 0),
+            "average_generation_time": getattr(self, "_avg_generation_time", 0.0),
+            "memory_usage": self._get_memory_usage(),
         }
-    
+
     def _get_memory_usage(self) -> Dict[str, float]:
         """Get memory usage statistics."""
-        import psutil
+        import psutil  # type: ignore
+
         process = psutil.Process()
         return {
-            'memory_mb': process.memory_info().rss / 1024 / 1024,
-            'memory_percent': process.memory_percent()
+            "memory_mb": process.memory_info().rss / 1024 / 1024,
+            "memory_percent": process.memory_percent(),
         }
 
 
 class PNGGeneratorFactory:
     """Factory for creating PNG generators."""
-    
+
     _generators = {
         "playwright": PlaywrightPNGGenerator,
         "advanced": AdvancedPNGGenerator,
     }
-    
+
     @classmethod
-    def create_generator(cls, generator_type: str = "playwright",
-                        browser_pool: Optional[BrowserPool] = None) -> PlaywrightPNGGenerator:
+    def create_generator(
+        cls, generator_type: str = "playwright", browser_pool: Optional[BrowserPool] = None
+    ) -> PlaywrightPNGGenerator:
         """
         Create PNG generator instance.
-        
+
         Args:
             generator_type: Type of generator
             browser_pool: Optional browser pool
-            
+
         Returns:
             PNG generator instance
         """
         if generator_type not in cls._generators:
             generator_type = "playwright"
-        
+
         return cls._generators[generator_type](browser_pool)
 
 
@@ -527,51 +552,120 @@ async def close_browser_pool() -> None:
 
 async def generate_png_from_html(html_content: str, options: RenderOptions) -> PNGResult:
     """
-    Generate PNG from HTML using global browser pool.
-    
+    Generate PNG from HTML using appropriate browser service.
+
+    If running in a Celery worker context, uses the browser service client.
+    Otherwise, uses the local browser pool.
+
     Args:
         html_content: HTML content to render
         options: Rendering options
-        
+
     Returns:
         PNGResult containing PNG data and metadata
     """
     global _global_browser_pool
-    
+
+    # Import browser service client for Celery worker context detection
+    from src.core.rendering.browser_service_client import (
+        is_celery_worker_context,
+        get_browser_service_client,
+    )
+    import base64
+
+    # Check if we're in a Celery worker context
+    logger.info("🔍 PNG GENERATOR: About to check Celery worker context")
+    is_celery_context = is_celery_worker_context()
+    logger.info(
+        "🔍 PNG GENERATOR: Celery context check result", is_celery_context=is_celery_context
+    )
+
+    if is_celery_context:
+        logger.info(
+            "✅ PNG GENERATOR: Detected Celery worker context, using browser service client"
+        )
+
+        try:
+            # Use browser service client instead of local browser pool
+            client = await get_browser_service_client()
+            result = await client.generate_screenshot(html_content, options.model_dump())
+
+            # Browser service returns dict with success/error/data structure
+            if not result.get("success", False):
+                raise PNGGenerationError(
+                    f"Browser service error: {result.get('error', 'Unknown error')}"
+                )
+
+            # Create PNGResult from browser service response
+            png_base64 = result.get("png_data", "")
+            png_data = base64.b64decode(png_base64)
+
+            return PNGResult(
+                png_data=png_data,
+                base64_data=png_base64,
+                width=options.width,
+                height=options.height,
+                file_size=result.get("file_size", len(png_data)),
+                metadata={
+                    "generator": "browser_service",
+                    "generation_method": "celery_worker_remote",
+                    "optimization": options.optimize_png,
+                    "full_page": options.full_page,
+                },
+            )
+
+        except Exception as e:
+            logger.warning(
+                "🚨 PNG GENERATOR: Browser service unavailable, falling back to local browser pool",
+                error=str(e),
+            )
+            # Fallback to local browser pool if service is unavailable
+    else:
+        logger.info("📍 PNG GENERATOR: Not in Celery worker context, using local browser pool")
+
+    # Use local browser pool (normal FastAPI service context or fallback)
+    logger.info("🔧 PNG GENERATOR: Using local browser pool for PNG generation")
+
     # Auto-initialize browser pool if not already initialized
     if not _global_browser_pool:
         logger.info("Auto-initializing browser pool for PNG generation")
         await initialize_browser_pool()
-    
+
     generator = PlaywrightPNGGenerator(_global_browser_pool)
-    return await generator.generate_png(html_content, options)
+    result = await generator.generate_png(html_content, options)
+
+    # Add metadata about generation method
+    if "metadata" not in result.metadata:
+        result.metadata = {}
+    result.metadata["generation_method"] = "local_browser_pool"
+
+    return result
 
 
 async def run_browser_pool() -> None:
     """
     Run the browser pool service.
-    
+
     This function initializes the global browser pool and keeps it running
     for use by other services. It handles graceful shutdown on interruption.
     """
     import signal
-    import sys
-    
+
     logger.info("Starting browser pool service...")
-    
+
     # Initialize the browser pool
     await initialize_browser_pool()
-    
+
     # Set up signal handlers for graceful shutdown
     shutdown_event = asyncio.Event()
-    
-    def signal_handler(sig, frame):
+
+    def signal_handler(sig: Any, frame: Any) -> None:  # type: ignore[misc]
         logger.info("Received shutdown signal, closing browser pool...")
         shutdown_event.set()
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
+
+    signal.signal(signal.SIGINT, signal_handler)  # type: ignore[arg-type]
+    signal.signal(signal.SIGTERM, signal_handler)  # type: ignore[arg-type]
+
     try:
         logger.info("Browser pool service is ready")
         # Wait for shutdown signal

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP SSE Client - Basic Demo</title>
+    <link rel="stylesheet" href="css/demo.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>MCP SSE Client - Basic Demo</h1>
+            <p>Real-time DSL to PNG rendering with Server-Sent Events</p>
+        </header>
+
+        <main class="main-content">
+            <div class="demo-panel">
+                <!-- Connection Configuration -->
+                <section class="config-section">
+                    <h3>Connection Configuration</h3>
+                    <div class="config-grid">
+                        <div class="form-group">
+                            <label for="serverUrl">Server URL:</label>
+                            <input type="text" id="serverUrl" value="http://localhost:8000"
+                                placeholder="http://localhost:8000">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiKey">API Key (optional):</label>
+                            <input type="password" id="apiKey" placeholder="Enter API key">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" id="connectBtn" class="btn btn-primary">Connect</button>
+                        <button type="button" id="disconnectBtn" class="btn btn-secondary" disabled>Disconnect</button>
+                    </div>
+                </section>
+
+                <!-- DSL Input -->
+                <section class="config-section">
+                    <h3>DSL Content</h3>
+                    <div class="sample-dsl">
+                        <h4>Quick Start Templates:</h4>
+                        <div class="sample-buttons">
+                            <button type="button" class="sample-btn" data-sample="simple">Simple Button</button>
+                            <button type="button" class="sample-btn" data-sample="form">Login Form</button>
+                            <button type="button" class="sample-btn" data-sample="dashboard">Dashboard Card</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="dslContent">DSL Content (JSON):</label>
+                        <textarea id="dslContent" placeholder="Enter your DSL content here..."></textarea>
+                    </div>
+                    <div class="config-grid">
+                        <div class="form-group">
+                            <label for="renderWidth">Width (px):</label>
+                            <input type="number" id="renderWidth" value="800" min="100" max="2000">
+                        </div>
+                        <div class="form-group">
+                            <label for="renderHeight">Height (px):</label>
+                            <input type="number" id="renderHeight" value="600" min="100" max="2000">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" id="renderBtn" class="btn btn-success" disabled>Render to PNG</button>
+                        <button type="button" id="validateBtn" class="btn btn-secondary" disabled>Validate DSL</button>
+                    </div>
+                </section>
+
+                <!-- Progress Tracking -->
+                <section class="config-section">
+                    <h3>Progress</h3>
+                    <div id="progressContainer"></div>
+                </section>
+
+                <!-- Results -->
+                <section class="config-section">
+                    <h3>Results</h3>
+                    <div id="resultContainer"></div>
+                </section>
+            </div>
+
+            <aside class="sidebar">
+                <!-- Connection Status -->
+                <div id="connectionStatus"></div>
+
+                <!-- Event Log -->
+                <div id="eventLogger"></div>
+
+                <!-- Instructions -->
+                <section class="config-section">
+                    <h3>Instructions</h3>
+                    <ol style="font-size: 0.875rem; line-height: 1.5;">
+                        <li>Enter your MCP server URL and optional API key</li>
+                        <li>Click "Connect" to establish SSE connection</li>
+                        <li>Choose a template or enter custom DSL content</li>
+                        <li>Adjust render dimensions if needed</li>
+                        <li>Click "Render to PNG" to start rendering</li>
+                        <li>Monitor real-time progress updates</li>
+                        <li>View the rendered PNG result</li>
+                    </ol>
+                </section>
+
+                <!-- Debug Options -->
+                <section class="config-section">
+                    <h3>Debug Options</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="debugMode"> Enable debug logging
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="asyncMode"> Use async rendering
+                        </label>
+                    </div>
+                </section>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Load modules -->
+    <script type="module">
+        import MCPSSEClient from './lib/mcp-sse-client.js';
+        import {
+            ProgressBar,
+            EventLogger,
+            ConnectionStatus,
+            ResultDisplay,
+            setupClientLogging,
+            getSampleDSL,
+            validateAndFormatDSL
+        } from './js/demo-utils.js';
+
+        // Global variables
+        let client = null;
+        let progressBar = null;
+        let eventLogger = null;
+        let connectionStatus = null;
+        let resultDisplay = null;
+
+        // DOM elements
+        const serverUrlInput = document.getElementById('serverUrl');
+        const apiKeyInput = document.getElementById('apiKey');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const dslContentTextarea = document.getElementById('dslContent');
+        const renderWidthInput = document.getElementById('renderWidth');
+        const renderHeightInput = document.getElementById('renderHeight');
+        const renderBtn = document.getElementById('renderBtn');
+        const validateBtn = document.getElementById('validateBtn');
+        const debugModeCheckbox = document.getElementById('debugMode');
+        const asyncModeCheckbox = document.getElementById('asyncMode');
+
+        // Initialize UI components
+        function initializeComponents() {
+            progressBar = new ProgressBar(document.getElementById('progressContainer'));
+            eventLogger = new EventLogger(document.getElementById('eventLogger'));
+            connectionStatus = new ConnectionStatus(document.getElementById('connectionStatus'));
+            resultDisplay = new ResultDisplay(document.getElementById('resultContainer'));
+
+            // Load sample DSL on page load
+            loadSampleDSL('simple');
+        }
+
+        // Load sample DSL content
+        function loadSampleDSL(sampleName) {
+            const samples = getSampleDSL();
+            if (samples[sampleName]) {
+                dslContentTextarea.value = samples[sampleName].content;
+
+                // Remove active class from all buttons
+                document.querySelectorAll('.sample-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+
+                // Add active class to selected button
+                document.querySelector(`[data-sample="${sampleName}"]`).classList.add('active');
+            }
+        }
+
+        // Create client instance
+        function createClient() {
+            const serverUrl = serverUrlInput.value.trim();
+            const apiKey = apiKeyInput.value.trim() || undefined;
+            const debug = debugModeCheckbox.checked;
+
+            if (!serverUrl) {
+                alert('Please enter a server URL');
+                return null;
+            }
+
+            return new MCPSSEClient(serverUrl, apiKey, { debug });
+        }
+
+        // Setup client event handlers
+        function setupClientHandlers(client) {
+            // Setup automatic logging
+            setupClientLogging(client, eventLogger);
+
+            // Connection state changes
+            client.addEventListener('connectionStateChanged', (event) => {
+                const { newState } = event.detail;
+                connectionStatus.update(newState, client.id, client.reconnectCount);
+                updateUIState(newState);
+            });
+
+            // Progress updates
+            client.addEventListener('renderProgress', (event) => {
+                const { progress, message, stage, estimated_remaining } = event.detail;
+                progressBar.update(progress, message, stage, estimated_remaining);
+            });
+
+            // Render completion
+            client.addEventListener('renderCompleted', (event) => {
+                progressBar.setSuccess('Rendering completed successfully!');
+                resultDisplay.displayRenderResult(event.detail.result);
+            });
+
+            // Render failure
+            client.addEventListener('renderFailed', (event) => {
+                progressBar.setError(`Rendering failed: ${event.detail.error}`);
+            });
+
+            // Validation completion
+            client.addEventListener('validationCompleted', (event) => {
+                resultDisplay.displayValidationResult(event.detail);
+            });
+
+            // Rate limiting
+            client.addEventListener('rateLimitWarning', (event) => {
+                alert(`Rate limit warning: ${event.detail.message}`);
+            });
+
+            client.addEventListener('rateLimitExceeded', (event) => {
+                alert(`Rate limit exceeded: ${event.detail.message}`);
+            });
+        }
+
+        // Update UI state based on connection
+        function updateUIState(connectionState) {
+            const isConnected = connectionState === 'connected';
+            const isConnecting = connectionState === 'connecting';
+
+            connectBtn.disabled = isConnected || isConnecting;
+            disconnectBtn.disabled = !isConnected && !isConnecting;
+            renderBtn.disabled = !isConnected;
+            validateBtn.disabled = !isConnected;
+            serverUrlInput.disabled = isConnected || isConnecting;
+            apiKeyInput.disabled = isConnected || isConnecting;
+        }
+
+        // Connect to server
+        async function connect() {
+            try {
+                if (client) {
+                    client.disconnect();
+                }
+
+                client = createClient();
+                if (!client) return;
+
+                setupClientHandlers(client);
+                connectionStatus.update('connecting');
+
+                await client.connect();
+                eventLogger.info('Connected successfully');
+
+            } catch (error) {
+                eventLogger.error('Connection failed', { error: error.message });
+                connectionStatus.update('failed');
+                alert(`Connection failed: ${error.message}`);
+            }
+        }
+
+        // Disconnect from server
+        function disconnect() {
+            if (client) {
+                client.disconnect();
+                client = null;
+                progressBar.reset();
+                progressBar.clearState();
+                resultDisplay.clear();
+                eventLogger.info('Disconnected manually');
+            }
+        }
+
+        // Render DSL to PNG
+        async function renderDSL() {
+            if (!client || !client.isConnected) {
+                alert('Not connected to server');
+                return;
+            }
+
+            const dslContent = dslContentTextarea.value.trim();
+            if (!dslContent) {
+                alert('Please enter DSL content');
+                return;
+            }
+
+            // Validate DSL format
+            const validation = validateAndFormatDSL(dslContent);
+            if (!validation.valid) {
+                alert(`Invalid DSL format: ${validation.error}`);
+                return;
+            }
+
+            try {
+                progressBar.clearState();
+                progressBar.reset();
+                resultDisplay.clear();
+
+                const options = {
+                    width: parseInt(renderWidthInput.value) || 800,
+                    height: parseInt(renderHeightInput.value) || 600
+                };
+
+                const request = {
+                    dsl_content: dslContent,
+                    options,
+                    async_mode: asyncModeCheckbox.checked
+                };
+
+                eventLogger.info('Starting render request', { options });
+
+                const result = await client.renderUIMarkup(request, {
+                    progress_callback: (progress) => {
+                        progressBar.update(
+                            progress.progress,
+                            progress.message,
+                            progress.stage,
+                            progress.estimated_remaining
+                        );
+                    }
+                });
+
+                eventLogger.info('Render completed', result);
+
+            } catch (error) {
+                eventLogger.error('Render failed', { error: error.message });
+                progressBar.setError(`Render failed: ${error.message}`);
+                alert(`Rendering failed: ${error.message}`);
+            }
+        }
+
+        // Validate DSL
+        async function validateDSL() {
+            if (!client || !client.isConnected) {
+                alert('Not connected to server');
+                return;
+            }
+
+            const dslContent = dslContentTextarea.value.trim();
+            if (!dslContent) {
+                alert('Please enter DSL content');
+                return;
+            }
+
+            try {
+                resultDisplay.clear();
+
+                const request = {
+                    dsl_content: dslContent,
+                    options: { strict: false }
+                };
+
+                eventLogger.info('Starting validation request');
+
+                const result = await client.validateDSL(request);
+
+                eventLogger.info('Validation completed', result);
+                resultDisplay.displayValidationResult(result);
+
+            } catch (error) {
+                eventLogger.error('Validation failed', { error: error.message });
+                alert(`Validation failed: ${error.message}`);
+            }
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        renderBtn.addEventListener('click', renderDSL);
+        validateBtn.addEventListener('click', validateDSL);
+
+        // Sample DSL buttons
+        document.querySelectorAll('.sample-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loadSampleDSL(btn.dataset.sample);
+            });
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (client) {
+                client.disconnect();
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeComponents();
+            eventLogger.info('Basic demo application initialized');
+        });
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            if (eventLogger) {
+                eventLogger.error('Unhandled error', {
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno
+                });
+            }
+        });
+
+        // Handle unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            if (eventLogger) {
+                eventLogger.error('Unhandled promise rejection', {
+                    reason: event.reason?.message || event.reason
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

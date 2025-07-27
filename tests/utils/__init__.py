@@ -1,11 +1,7 @@
 """
-Test Utilities
-==============
+Test Utils Package
+==================
 
-Common utilities and helpers for testing.
+Utility functions and helpers for testing the DSL to PNG MCP server.
+Contains shared test utilities and helper functions.
 """
-
-from .assertions import *
-from .data_generators import *
-from .mocks import *
-from .helpers import *

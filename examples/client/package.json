@@ -1,0 +1,59 @@
+{
+  "name": "@dsl-to-png/mcp-sse-client",
+  "version": "1.0.0",
+  "description": "Client library for DSL to PNG MCP Server with Server-Sent Events support",
+  "main": "lib/mcp-sse-client.js",
+  "types": "lib/mcp-sse-client.d.ts",
+  "files": [
+    "lib/**/*",
+    "README.md",
+    "API.md"
+  ],
+  "scripts": {
+    "build": "echo 'No build step required for ES modules'",
+    "test": "echo 'Tests should be run through demo applications'",
+    "demo": "python3 -m http.server 8080",
+    "lint": "echo 'No linting configured yet'"
+  },
+  "keywords": [
+    "mcp",
+    "sse",
+    "server-sent-events",
+    "dsl",
+    "png",
+    "rendering",
+    "client",
+    "javascript",
+    "typescript"
+  ],
+  "author": "DSL to PNG MCP Project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/dsl-to-png-mcp.git",
+    "directory": "examples/client"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/dsl-to-png-mcp/issues"
+  },
+  "homepage": "https://github.com/your-org/dsl-to-png-mcp/tree/main/examples/client",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browser": {
+    "lib/mcp-sse-client.js": "lib/mcp-sse-client.js"
+  },
+  "devDependencies": {},
+  "dependencies": {},
+  "peerDependencies": {},
+  "exports": {
+    ".": {
+      "import": "./lib/mcp-sse-client.js",
+      "types": "./lib/mcp-sse-client.d.ts"
+    },
+    "./types": {
+      "import": "./lib/types.js",
+      "types": "./lib/types.d.ts"
+    }
+  }
+}

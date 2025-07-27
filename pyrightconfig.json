@@ -1,5 +1,7 @@
 {
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "exclude": [
     "tests",
     "test_tmp",
@@ -35,15 +37,16 @@
   "typeCheckingMode": "strict",
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
-  "pythonVersion": "3.9",
+  "pythonVersion": "3.12",
   "pythonPlatform": "Linux",
   "executionEnvironments": [
     {
-      "root": "src",
-      "pythonVersion": "3.9"
+      "root": ".",
+      "pythonVersion": "3.12",
+      "extraPaths": [
+        "."
+      ]
     }
   ],
-  "venvPath": ".",
-  "venv": ".venv",
   "stubPath": "typings"
 }

@@ -1,13 +1,7 @@
 """
-Test Suite
-==========
+Test Package
+============
 
-Comprehensive test suite matching the src/ directory structure.
-
-Test Categories:
-- unit: Unit tests for individual components
-- integration: Integration tests for component interactions
-- api: API endpoint testing
-- mcp: MCP protocol testing
-- performance: Performance and load testing
+Comprehensive test suite for the DSL to PNG MCP server.
+Includes unit, integration, performance, security, and E2E tests.
 """

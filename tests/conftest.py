@@ -23,12 +23,20 @@ from playwright.async_api import async_playwright
 
 # Import application modules
 from src.config.settings import Settings, get_settings
+from pydantic_settings import SettingsConfigDict
 from src.config.logging import get_logger
 from src.config.database import get_redis_client
 from src.api.main import app
 from src.models.schemas import (
-    DSLDocument, DSLElement, ElementType, ElementLayout, ElementStyle,
-    RenderOptions, PNGResult, ParseResult, DSLRenderRequest
+    DSLDocument,
+    DSLElement,
+    ElementType,
+    ElementLayout,
+    ElementStyle,
+    RenderOptions,
+    PNGResult,
+    ParseResult,
+    DSLRenderRequest,
 )
 from src.core.rendering.png_generator import BrowserPool
 from src.core.dsl.parser import DSLParserFactory
@@ -37,6 +45,7 @@ from src.core.dsl.parser import DSLParserFactory
 # Test settings override
 class TestSettings(Settings):
     """Test-specific settings."""
+
     environment: str = "testing"
     debug: bool = True
     redis_url: str = "redis://localhost:6379/15"  # Use test database
@@ -47,17 +56,8 @@ class TestSettings(Settings):
     browser_pool_size: int = 2  # Smaller pool for tests
     playwright_headless: bool = True
     log_level: str = "DEBUG"
-    
-    class Config:
-        env_file = ".env.test"
 
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+    model_config = SettingsConfigDict(env_file=".env.test")
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +69,7 @@ def test_settings() -> TestSettings:
 @pytest.fixture(scope="session", autouse=True)
 def override_settings(test_settings: TestSettings):
     """Override application settings for testing."""
-    with patch('src.config.settings.get_settings', return_value=test_settings):
+    with patch("src.config.settings.get_settings", return_value=test_settings):
         yield test_settings
 
 
@@ -85,12 +85,12 @@ def temp_dir() -> Generator[Path, None, None]:
 async def redis_client(test_settings: TestSettings) -> AsyncGenerator[redis.Redis, None]:
     """Redis client for testing."""
     client = redis.from_url(test_settings.redis_url)
-    
+
     # Clear test database
     await client.flushdb()
-    
+
     yield client
-    
+
     # Cleanup
     await client.flushdb()
     await client.close()
@@ -132,58 +132,62 @@ async def mock_browser_pool() -> AsyncMock:
 @pytest.fixture
 def sample_dsl_json() -> str:
     """Sample JSON DSL document."""
-    return json.dumps({
-        "title": "Test UI",
-        "width": 800,
-        "height": 600,
-        "elements": [
-            {
-                "type": "button",
-                "id": "test-button",
-                "layout": {"x": 100, "y": 100, "width": 150, "height": 40},
-                "style": {"background": "#007bff", "color": "white"},
-                "label": "Click Me"
-            },
-            {
-                "type": "text",
-                "id": "test-text",
-                "layout": {"x": 100, "y": 160, "width": 200, "height": 30},
-                "text": "Hello World",
-                "style": {"fontSize": 16}
-            }
-        ]
-    })
+    return json.dumps(
+        {
+            "title": "Test UI",
+            "width": 800,
+            "height": 600,
+            "elements": [
+                {
+                    "type": "button",
+                    "id": "test-button",
+                    "layout": {"x": 100, "y": 100, "width": 150, "height": 40},
+                    "style": {"background": "#007bff", "color": "white"},
+                    "label": "Click Me",
+                },
+                {
+                    "type": "text",
+                    "id": "test-text",
+                    "layout": {"x": 100, "y": 160, "width": 200, "height": 30},
+                    "text": "Hello World",
+                    "style": {"fontSize": 16},
+                },
+            ],
+        }
+    )
 
 
 @pytest.fixture
 def sample_dsl_yaml() -> str:
     """Sample YAML DSL document."""
-    return yaml.dump({
-        "title": "YAML Test UI",
-        "width": 400,
-        "height": 300,
-        "elements": [
-            {
-                "type": "container",
-                "id": "main-container",
-                "layout": {"x": 0, "y": 0, "width": 400, "height": 300},
-                "children": [
-                    {
-                        "type": "input",
-                        "id": "username",
-                        "layout": {"x": 50, "y": 50, "width": 300, "height": 35},
-                        "placeholder": "Enter username"
-                    },
-                    {
-                        "type": "button",
-                        "id": "submit",
-                        "layout": {"x": 50, "y": 100, "width": 100, "height": 35},
-                        "label": "Submit"
-                    }
-                ]
-            }
-        ]
-    })
+    return yaml.dump(
+        {
+            "title": "YAML Test UI",
+            "width": 400,
+            "height": 300,
+            "elements": [
+                {
+                    "type": "container",
+                    "id": "main-container",
+                    "layout": {"x": 0, "y": 0, "width": 400, "height": 300},
+                    "children": [
+                        {
+                            "type": "input",
+                            "id": "username",
+                            "layout": {"x": 50, "y": 50, "width": 300, "height": 35},
+                            "placeholder": "Enter username",
+                        },
+                        {
+                            "type": "button",
+                            "id": "submit",
+                            "layout": {"x": 50, "y": 100, "width": 100, "height": 35},
+                            "label": "Submit",
+                        },
+                    ],
+                }
+            ],
+        }
+    )
 
 
 @pytest.fixture
@@ -195,19 +199,21 @@ def invalid_dsl_json() -> str:
 @pytest.fixture
 def invalid_dsl_semantic() -> str:
     """Semantically invalid DSL for validation testing."""
-    return json.dumps({
-        "title": "Invalid Semantic",
-        "width": 800,
-        "height": 600,
-        "elements": [
-            {
-                "type": "text",
-                "children": [  # Text elements cannot have children
-                    {"type": "button", "label": "Invalid"}
-                ]
-            }
-        ]
-    })
+    return json.dumps(
+        {
+            "title": "Invalid Semantic",
+            "width": 800,
+            "height": 600,
+            "elements": [
+                {
+                    "type": "text",
+                    "children": [  # Text elements cannot have children
+                        {"type": "button", "label": "Invalid"}
+                    ],
+                }
+            ],
+        }
+    )
 
 
 @pytest.fixture
@@ -223,16 +229,16 @@ def sample_dsl_document() -> DSLDocument:
                 id="test-button",
                 layout=ElementLayout(x=100, y=100, width=150, height=40),
                 style=ElementStyle(background="#007bff", color="white"),
-                label="Test Button"
+                label="Test Button",
             ),
             DSLElement(
                 type=ElementType.TEXT,
                 id="test-text",
                 layout=ElementLayout(x=100, y=160, width=200, height=30),
                 text="Test Text",
-                style=ElementStyle(font_size=16)
-            )
-        ]
+                style=ElementStyle(font_size=16),
+            ),
+        ],
     )
 
 
@@ -245,17 +251,16 @@ def sample_render_options() -> RenderOptions:
         device_scale_factor=1.0,
         wait_for_load=True,
         optimize_png=True,
-        timeout=30
+        timeout=30,
     )
 
 
 @pytest.fixture
-def sample_render_request(sample_dsl_json: str, sample_render_options: RenderOptions) -> DSLRenderRequest:
+def sample_render_request(
+    sample_dsl_json: str, sample_render_options: RenderOptions
+) -> DSLRenderRequest:
     """Sample render request."""
-    return DSLRenderRequest(
-        dsl_content=sample_dsl_json,
-        options=sample_render_options
-    )
+    return DSLRenderRequest(dsl_content=sample_dsl_json, options=sample_render_options)
 
 
 @pytest.fixture
@@ -268,7 +273,7 @@ def mock_png_result() -> PNGResult:
         width=800,
         height=600,
         file_size=len(png_data),
-        metadata={"test": True}
+        metadata={"test": True},
     )
 
 
@@ -276,11 +281,7 @@ def mock_png_result() -> PNGResult:
 def mock_parse_result(sample_dsl_document: DSLDocument) -> ParseResult:
     """Mock parse result for testing."""
     return ParseResult(
-        success=True,
-        document=sample_dsl_document,
-        errors=[],
-        warnings=[],
-        processing_time=0.1
+        success=True, document=sample_dsl_document, errors=[], warnings=[], processing_time=0.1
     )
 
 
@@ -304,16 +305,16 @@ def complex_dsl_document() -> DSLDocument:
                         id="nav-title",
                         layout=ElementLayout(x=20, y=15, width=200, height=30),
                         text="My App",
-                        style=ElementStyle(font_size=20, font_weight="bold")
+                        style=ElementStyle(font_size=20, font_weight="bold"),
                     ),
                     DSLElement(
                         type=ElementType.BUTTON,
                         id="nav-button",
                         layout=ElementLayout(x=1050, y=10, width=80, height=40),
                         label="Login",
-                        style=ElementStyle(background="#007bff", color="white")
-                    )
-                ]
+                        style=ElementStyle(background="#007bff", color="white"),
+                    ),
+                ],
             ),
             DSLElement(
                 type=ElementType.CONTAINER,
@@ -331,9 +332,9 @@ def complex_dsl_document() -> DSLDocument:
                                 id="sidebar-title",
                                 layout=ElementLayout(x=20, y=20, width=200, height=30),
                                 text="Navigation",
-                                style=ElementStyle(font_size=16, font_weight="bold")
+                                style=ElementStyle(font_size=16, font_weight="bold"),
                             )
-                        ]
+                        ],
                     ),
                     DSLElement(
                         type=ElementType.CONTAINER,
@@ -348,7 +349,7 @@ def complex_dsl_document() -> DSLDocument:
                                     background="white",
                                     border="1px solid #dee2e6",
                                     border_radius="8px",
-                                    padding="20px"
+                                    padding="20px",
                                 ),
                                 children=[
                                     DSLElement(
@@ -356,25 +357,25 @@ def complex_dsl_document() -> DSLDocument:
                                         id="card-title",
                                         layout=ElementLayout(x=0, y=0, width=360, height=40),
                                         text="Information Card",
-                                        style=ElementStyle(font_size=18, font_weight="bold")
+                                        style=ElementStyle(font_size=18, font_weight="bold"),
                                     ),
                                     DSLElement(
                                         type=ElementType.TEXT,
                                         id="card-content",
                                         layout=ElementLayout(x=0, y=50, width=360, height=200),
                                         text="This is a sample card with some content to demonstrate complex layouts.",
-                                        style=ElementStyle(font_size=14, color="#666")
-                                    )
-                                ]
+                                        style=ElementStyle(font_size=14, color="#666"),
+                                    ),
+                                ],
                             )
-                        ]
-                    )
-                ]
-            )
+                        ],
+                    ),
+                ],
+            ),
         ],
         css="body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }",
         theme="modern",
-        responsive_breakpoints={"sm": 640, "md": 768, "lg": 1024, "xl": 1280}
+        responsive_breakpoints={"sm": 640, "md": 768, "lg": 1024, "xl": 1280},
     )
 
 
@@ -388,7 +389,7 @@ async def mock_storage_manager():
         "total_files": 10,
         "total_size": 1024000,
         "hot_storage": 5,
-        "cold_storage": 5
+        "cold_storage": 5,
     }
     return mock_manager
 
@@ -404,15 +405,9 @@ def mock_celery_task():
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest."""
-    # Add custom markers
-    config.addinivalue_line("markers", "unit: Unit tests")
-    config.addinivalue_line("markers", "integration: Integration tests")
-    config.addinivalue_line("markers", "api: API tests")
-    config.addinivalue_line("markers", "mcp: MCP protocol tests")
-    config.addinivalue_line("markers", "docker: Docker deployment tests")
-    config.addinivalue_line("markers", "performance: Performance tests")
-    config.addinivalue_line("markers", "security: Security tests")
-    config.addinivalue_line("markers", "slow: Slow tests that may take longer to run")
+    # All markers are now defined in pyproject.toml [tool.pytest.ini_options]
+    # This function is kept for any future pytest configuration needs
+    pass
 
 
 def pytest_collection_modifyitems(config, items):
@@ -440,6 +435,7 @@ def pytest_collection_modifyitems(config, items):
 async def async_client():
     """Async HTTP client for API testing."""
     import httpx
+
     async with httpx.AsyncClient(app=app, base_url="http://test") as client:
         yield client
 
@@ -456,13 +452,13 @@ def example_dsls(test_data_dir: Path) -> Dict[str, str]:
     """Load example DSL files."""
     examples = {}
     examples_dir = Path("examples")
-    
+
     if examples_dir.exists():
         for file_path in examples_dir.glob("*.json"):
             examples[file_path.stem] = file_path.read_text()
         for file_path in examples_dir.glob("*.yaml"):
             examples[file_path.stem] = file_path.read_text()
-    
+
     return examples
 
 
@@ -472,42 +468,43 @@ def performance_dsl_large() -> str:
     """Large DSL document for performance testing."""
     elements = []
     for i in range(100):
-        elements.append({
-            "type": "button",
-            "id": f"button-{i}",
-            "layout": {"x": (i % 10) * 80, "y": (i // 10) * 50, "width": 70, "height": 40},
-            "label": f"Button {i}",
-            "style": {"background": f"hsl({i * 3.6}, 70%, 50%)", "color": "white"}
-        })
-    
-    return json.dumps({
-        "title": "Large Performance Test",
-        "width": 800,
-        "height": 1000,
-        "elements": elements
-    })
+        elements.append(
+            {
+                "type": "button",
+                "id": f"button-{i}",
+                "layout": {"x": (i % 10) * 80, "y": (i // 10) * 50, "width": 70, "height": 40},
+                "label": f"Button {i}",
+                "style": {"background": f"hsl({i * 3.6}, 70%, 50%)", "color": "white"},
+            }
+        )
+
+    return json.dumps(
+        {"title": "Large Performance Test", "width": 800, "height": 1000, "elements": elements}
+    )
 
 
 # Error simulation fixtures
 @pytest.fixture
 def error_simulation():
     """Helper for simulating various error conditions."""
+
     class ErrorSimulator:
         @staticmethod
         def redis_connection_error():
             return redis.ConnectionError("Connection refused")
-        
+
         @staticmethod
         def browser_timeout_error():
             from playwright.async_api import TimeoutError
+
             return TimeoutError("Page timeout")
-        
+
         @staticmethod
         def invalid_json_error():
             return json.JSONDecodeError("Invalid JSON", "", 0)
-        
+
         @staticmethod
         def file_not_found_error():
             return FileNotFoundError("File not found")
-    
+
     return ErrorSimulator()
